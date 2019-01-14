@@ -1,0 +1,12 @@
+Output file name                                      : pre_out.txt
+File with meteorological stations                     : met_stations.txt
+File with common parameters                           : hbv_common_parameters.txt
+File with geographical analysis area                  : stations.asc
+File with grid cell elevations                        : ../GeoData/ny_hoh.asc
+File with lake percentage                             : ../GeoData/ny_sjopro_250.asc
+File with forest percentage                           : ../GeoData/ny_skogpro.asc
+File with bog percentage                              : ../GeoData/myrpro.asc
+File with glacier percentage                          : ../GeoData/ny_brepro.asc
+File with tree levels                                 : ../GeoData/ny_skoggr.asc
+File with sub-catchment hierarchy                     : watershed.txt
+File with watercourse/sub-catchment identifiers       : ../GeoData/ny_nvestation.asc
