@@ -1,0 +1,19 @@
+Type of model run, simulation(S) or calibration(C)                                 : S
+Model states, not in use(N), read(R), write(W) or both read and write(B)           : N
+Input data format, grid files(G) or time series file(T)                            : T
+Potential evaporation, temperature index (T) or long-term mean monthly values (M)  : T
+Output file name                                                                   : hbv_out.txt
+Start model date and time (day, month, year, hour, minute)                         : 1 6 1961 12 0
+Start simulation date and time (day, month, year, hour, minute)                    : 1 1 1962 12 0
+End simulation date and time (day, month, year, hour, minute)                      : 31 12 2012 12 0
+File with meteorological stations                                                  : met_stations.txt
+File with common parameters                                                        : hbv_common_parameters.txt
+File with landsurface parameters                                                   : hbv_landsurface_parameters.txt
+File with HBV subsurface parameters                                                : hbv_soil_parameters.txt
+File with landscape elements selected for time series output                       : hbv_elements.txt
+File with landscape element information                                            : hbv_landscape.txt
+File with observed streamflow data                                                 : obs_streamflow.txt
+File with sub-catchment hierarchy                                                  : watershed.txt
+File with information about sub-catchment elements and landscape elements          : hbv_waterland.txt
+File with precipitation and temperature correction for catchments                  : catchment_correction.txt
+File with input data                                                               : 76.5.pt.txt

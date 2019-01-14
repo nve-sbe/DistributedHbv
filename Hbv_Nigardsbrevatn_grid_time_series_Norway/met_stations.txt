@@ -1,0 +1,4 @@
+Number of precipitation stations : 1
+Number of temperature stations   : 1
+P       1  75000  6.856e+06  1510.0      Nigardsbreen
+T       1  75000  6.856e+06  1510.0      Nigardsbreen
