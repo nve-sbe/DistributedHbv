@@ -1,0 +1,8 @@
+Number of precipitation stations : 3
+Number of temperature stations   : 3
+P   5608    334269    6860616    242.0        Selbu-Stubbe
+P   5609    334269    6860616    475.0        Berkaak-Lynghol
+P   5610    334269    6860616    625.0        Roros Lufthavn
+T   5608    334269    6860616    242.0        Selbu-Stubbe
+T   5609    334269    6860616    475.0        Berkaak-Lynghol
+T   5617    334269    6860616    625.0        Roros Lufthavn
