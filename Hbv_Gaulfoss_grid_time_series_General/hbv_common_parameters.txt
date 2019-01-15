@@ -1,0 +1,22 @@
+Number of seconds per time step    SECONDS_TIMESTEP  : 86400
+Number of precipitation series     NUM_PREC_SERIES   : 3
+Number of temperature series       NUM_TEMP_SERIES   : 3
+Prec. grad. low  per 100 m         PREC_GRAD_LOW   : .99898547528
+Prec. grad. high per 100 m         PREC_GRAD         : 1.0
+Altitude for 50 % reduction        GRAD_CHANGE_ALT   : 0
+Prec. correction for rain          PREC_CORR_RAIN    : 1.12329246
+Additional prec. corr. for snow    PREC_CORR_SNOW    : 1.0
+Temp. lapse rate dry days          LAPSE_DRY       : -.8908291732
+Temp. lapse rate precip. days      LAPSE_WET       : -.8908291732
+Lake temperature memory (days)     DAY_TEMP_MEMORY   : 30.0
+Lake evaporation constant          LAKE_EPOT_PAR     : 1.03645E-5
+Rating curve constant              KLAKE             : .005120282
+Rating curve saddle point (m)      DELTA_LEVEL       : 0.0
+Rating curve exponent              NLAKE             : 1.0
+Initial soil moisture        INITIAL_SOIL_MOISTURE   : .20
+Initial upper zone           INITIAL_UPPER_ZONE      : 0.0
+Initial lower zone           INITIAL_LOWER_ZONE      : .05
+Initial lake temperature     INITIAL_LAKE_TEMP       : 0.0
+Initial lake level           INITIAL_LAKE_LEVEL      : 0.0
+Initial snow storage         INITIAL_SNOW_STORAGE    : 0.0
+Day no. for zero snow storage      DAY_SNOW_ZERO     : 244
