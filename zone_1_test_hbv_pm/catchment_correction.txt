@@ -1,0 +1,5 @@
+Catchment id.   Precipitation correction    Temperature correction
+10000001   1.0000000                    -.8618476
+2340018    1.0000000                    -.8618476
+2340013    1.0000000                    -.8618476
+2120010    1.0000000                    -.8618476

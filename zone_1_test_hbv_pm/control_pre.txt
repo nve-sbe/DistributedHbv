@@ -1,0 +1,34 @@
+Output file name                                      : pre_out.txt
+File with meteorological stations                     : met_stations.txt
+File with common parameters                           : hbv_common_parameters.txt
+File with geographical analysis area                  : stations.asc
+File with grid cell elevations                        : /data02/Ican/data/DEM/dem_final.asc
+File with slope angles                                : /data02/Ican/data/DEM/dem_final.asc
+File with slope aspects                               : /data02/Ican/data/DEM/dem_final.asc
+File with latitude                                    : /data02/Ican/data/landuse_final/lat_nsfr.asc
+File with T1                                          : /data02/Ican/data/landuse_final/T1_nsfr.asc
+File with lake percentage                             : /data02/Ican/data/landuse_final/freshwater.asc
+File with class 0 open land percentage                : /data02/Ican/data/landuse_final/open.asc  
+File with class 1 bog land surface percentage         : /data02/Ican/data/landuse_final/bog.asc	    
+File with class 2 built-up land surface percentage    : /data02/Ican/data/landuse_final/built-up.asc    
+File with class 3 cropland land surface percentage    : /data02/Ican/data/landuse_final/cropland.asc     
+File with class 4 heather land surface percentage     : /data02/Ican/data/landuse_final/heather.asc     
+File with class 5 bedrock land surface percentage     : /data02/Ican/data/landuse_final/bedrock.asc     
+File with class 6 forest1 land surface percentage     : /data02/Ican/data/landuse_final/forest1.asc     
+File with class 7 forest2 land surface percentage     : /data02/Ican/data/landuse_final/forest2.asc     
+File with class 8 forest3 land surface percentage     : /data02/Ican/data/landuse_final/forest3.asc     
+File with class 9 forest4 land surface percentage     : /data02/Ican/data/landuse_final/forest4.asc    
+File with class 10 forest5 land surface percentage    : /data02/Ican/data/landuse_final/forest5.asc      
+File with class 10 forest6 land surface percentage    : /data02/Ican/data/landuse_final/forest6.asc      
+File with class 12 forest7 land surface percentage    : /data02/Ican/data/landuse_final/forest7.asc      
+File with class 13 forest8 land surface percentage    : /data02/Ican/data/landuse_final/forest8.asc      
+File with class 14 forest9 land surface percentage    : /data02/Ican/data/landuse_final/forest9.asc     
+File with class 15 forest10 land surface percentage   : /data02/Ican/data/landuse_final/forest10.asc      
+File with class 16 forest11 land surface percentage   : /data02/Ican/data/landuse_final/forest11.asc      
+File with class 17 forest12 land surface percentage   : /data02/Ican/data/landuse_final/forest12.asc      
+File with class 18  land surface percentage           : /hdata/fou/DistModel/DistHbv/GEO_DATA/zerogrid.asc       
+File with class 19 land surface percentage            : /hdata/fou/DistModel/DistHbv/GEO_DATA/zerogrid.asc    
+File with glacier percentage                          : /data02/Ican/data/landuse_final/snow.asc
+File with soil type                                   : /data02/Ican/data/Soil/soil_new.asc
+File with sub-catchment hierarchy                     : watershed.txt
+File with watercourse/sub-catchment identifiers       : catchment.asc
