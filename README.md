@@ -7,7 +7,7 @@ Spatially distributed HBV hydrological model with general land surface character
 ## HbvGeneralPM
 Spatially distributed HBV hydrological model with general land surface characteristics and Penman-Monteith equation  
 
-## HbvGeneral
+## HbvGeneralSnowSim
 Spatially distributed HBV hydrological model with general land surface characteristics, Penman-Monteith equation and snow simulation results from  seNorge snow model. 
 
 ## Introduction
