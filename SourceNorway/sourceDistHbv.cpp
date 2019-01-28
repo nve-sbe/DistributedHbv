@@ -362,6 +362,7 @@ int main(int argc, char *argv[])
           precStationsWeightedElevation = precStationsWeightedElevation/sumWeight;
         }
       }
+      DistHbv[landIndex].SetPrecStationsWeightedElevation(precStationsWeightedElevation);
       //      cout << " precStationsWeightedElevation = " << precStationsWeightedElevation << endl;
       sumWeight=0.0;
       tempStationsWeightedElevation=0.0;
@@ -381,6 +382,7 @@ int main(int argc, char *argv[])
           tempStationsWeightedElevation = tempStationsWeightedElevation/sumWeight;
         }
       }
+      DistHbv[landIndex].SetTempStationsWeightedElevation(tempStationsWeightedElevation);
       //      cout << " tempStationsWeightedElevation = " << tempStationsWeightedElevation << endl;
         
       /*      for (j=0; j<ParGeneralStore->GetNUM_PREC_SERIES(); j++) {
