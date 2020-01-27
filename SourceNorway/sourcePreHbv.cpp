@@ -618,8 +618,8 @@ void ReadLandUseGeneral(DistributedHbv * const DistHbv, int nRows, int nCols, in
 
   // Read elevation of grid cells
   //  previousValue=-9999.0;
-  /*  cout << " File with grid cell elevations: ";
-      cin >> fileName;
+  cout << " File with grid cell elevations: " << endl;
+  /*      cin >> fileName;
       cout << endl;*/
   fileControl.ignore(100,':');
   fileControl >> fileName;
@@ -629,6 +629,7 @@ void ReadLandUseGeneral(DistributedHbv * const DistHbv, int nRows, int nCols, in
     cout << endl << " Error opening file " << fileName << endl << endl;
     exit (1);
   }
+  cout << fileName << endl;
   finElevation >> buffer >> nCo;
   finElevation >> buffer >> nRo;
   finElevation >> buffer >> xllC;
@@ -738,8 +739,8 @@ void ReadLandUseGeneral(DistributedHbv * const DistHbv, int nRows, int nCols, in
 
   // Read percentage of grid cells covered by lakes
   //  previousValue=-9999.0;
-  /*cout << " File with lake percentage: ";
-    cin >> fileName;
+  cout << " File with lake percentage: " << endl;
+  /*  cin >> fileName;
     cout << endl;*/
   fileControl.ignore(100,':');
   fileControl >> fileName;
@@ -749,6 +750,7 @@ void ReadLandUseGeneral(DistributedHbv * const DistHbv, int nRows, int nCols, in
     cout << endl << " Error opening file " << fileName << endl << endl;
     exit (1);
   }
+  cout << fileName << endl;
   finLakePercent >> buffer >> nCo;
   finLakePercent >> buffer >> nRo;
   finLakePercent >> buffer >> xllC;
@@ -824,8 +826,8 @@ void ReadLandUseGeneral(DistributedHbv * const DistHbv, int nRows, int nCols, in
 
   // Read percentage of grid cells covered by glaciers
   //  previousValue=-9999.0;
-  /*cout << " File with glacier percentage: ";
-    cin >> fileName;
+  cout << " File with glacier percentage: " << endl;
+  /*  cin >> fileName;
     cout << endl;*/
   fileControl.ignore(100,':');
   fileControl >> fileName;
@@ -835,6 +837,7 @@ void ReadLandUseGeneral(DistributedHbv * const DistHbv, int nRows, int nCols, in
     cout << endl << " Error opening file " << fileName << endl << endl;
     exit (1);
   }
+  cout << fileName << endl;
   finGlacierPercent >> buffer >> nCo;
   finGlacierPercent >> buffer >> nRo;
   finGlacierPercent >> buffer >> xllC;

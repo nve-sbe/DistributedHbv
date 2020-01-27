@@ -24,6 +24,8 @@ void WaterBalanceGrid(DistributedHbv * const DistHbv,  ParametersGeneral * ParGe
                       InputElement * InputElementStore, int initialTimeSteps, int numberTimeSteps,
                       int numLand, int timeStep, int nRows, int nCols, DateTime datetime, char * metPath,
                       unsigned short int * precip10, unsigned short int * temp10K, bool * inputDataFound);
+void SetElementCorrection(DistributedHbv * const DistHbv, int numLand, int numberCorrectionCatchments, int * correctionCatchments, 
+			  double * correctionPrecipitation, double * correctionTemperature, ofstream &fout);
 void TraverseCorrectionSubCatchment(SubCatchment * const thisSubCatchment, int numberCorrectionCatchments,
                                    int * correctionCatchments, double * correctionPrecipitation, 
                                    double * correctionTemperature, ofstream &fout);
@@ -633,6 +635,7 @@ int main(int argc, char *argv[])
     i++;
   }
   numberCorrectionCatchments = i;
+  SetElementCorrection(DistHbv, numLand, numberCorrectionCatchments, correctionCatchments, correctionPrecipitation, correctionTemperature, fout);
   for (i=0; i<numWatcOut; i++) { 
     TraverseCorrectionSubCatchment(Outlet[i], numberCorrectionCatchments, correctionCatchments, 
                                    correctionPrecipitation, correctionTemperature, fout);
@@ -1156,6 +1159,28 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
   }
   filePrec.close();
   fileTemp.close();
+}
+
+
+void SetElementCorrection(DistributedHbv * const DistHbv, int numLand, int numberCorrectionCatchments, int * correctionCatchments, 
+			  double * correctionPrecipitation, double * correctionTemperature, ofstream &fout)
+{
+  int i, k;
+  double precCorr, tempCorr;
+
+  if (numberCorrectionCatchments > 0) {
+    precCorr = correctionPrecipitation[0];
+    tempCorr = correctionTemperature[0];
+  }
+  else {
+    precCorr = 1.0;
+    tempCorr = 0.0;
+  }
+
+  for (k=0; k<numLand; k++) {
+    DistHbv[k].SetPrecipitationCorrection(precCorr);
+    DistHbv[k].SetTemperatureCorrection(tempCorr);
+  }
 }
 
 
