@@ -493,7 +493,7 @@ void ReadLandUse(DistributedHbv * const DistHbv, int nRows, int nCols, int noDat
   finTreeLevel >> buffer >> cellS;
   finTreeLevel >> buffer >> noDa;
   if (nCo!=nCols || nRo!=nRows || xllC!=xllCorner || yllC!=yllCorner || cellS!=cellSize || noDa!=noData) {
-    cout << "\n\n Error in grid header information for glacier percent!\n\n";
+    cout << "\n\n Error in grid header information for tree level!\n\n";
     cout << " nCols        " << nCo << "\t  " << nCols << endl;
     cout << " nRows        " << nRo << "\t  " << nRows << endl;
     cout << " xllCorner    " << xllC << "\t  " << xllCorner << endl;
