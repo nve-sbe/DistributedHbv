@@ -1,6 +1,6 @@
 # Number of catchments: 2
-0 :  1220009    1.0
-1 :  1220011    1.0
+0 :  1220009    1.0    1.0
+1 :  1220011    1.0    1.0
 # Number of catchment outlets: 1
 0
 # Hierarchy of catchments
