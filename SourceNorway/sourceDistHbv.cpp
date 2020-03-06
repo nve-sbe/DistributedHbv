@@ -30,6 +30,8 @@ void TraverseCorrectionSubCatchment(SubCatchment * const thisSubCatchment, int n
                                    int * correctionCatchments, double * correctionPrecipitation, 
                                    double * correctionTemperature, ofstream &fout);
 void TraverseCorrectionLandScape(DistributedHbv * const thisElement, double precCorr, double tempCorr);
+void TraverseMaxBas(SubCatchment * const thisSubCatchment, int initialTimeSteps, int numberTimeSteps, ofstream &fout);
+void TransformMaxBas(SubCatchment * const thisSubCatchment, int initialTimeSteps, int numberTimeSteps, ofstream &fout);
 void TraverseSubCatchment(SubCatchment * const thisSubCatchment, int timeStep, ofstream &fout);
 void TraverseLandScape(DistributedHbv * const thisElement, int timeStep, ofstream &fout);
 void TraverseMissingDataSubCatchment(SubCatchment * const thisSubCatchment, int timeStep, ofstream &fout);
@@ -63,6 +65,7 @@ int main(int argc, char *argv[])
   bool modelCalibration=false;
   bool readModelStates=false;
   bool writeModelStates=false;
+  bool maxBasTransform=false;
   char fileName[100];
   char fileNameInput[100];
   char fileObsStreamflow[100];
@@ -91,7 +94,7 @@ int main(int argc, char *argv[])
   double sumWeight;
   double sumArea;
   double precStationsWeightedElevation, tempStationsWeightedElevation;
-  double correction;
+  double correction, maxBas;
   double xllCorner, yllCorner, cellSize;
   double elementArea, elementElevation, elementSlopeAngle, elementAspect, lakePercent, glacierPercent;
   double areaFraction[maximumNumberLandClasses];
@@ -550,14 +553,16 @@ int main(int argc, char *argv[])
   cout << "\n # Number of sub-catchments " << numWatc << endl;
   SubCatchment *CatchmentElement = new SubCatchment [numWatc];
   for (i=0; i<numWatc; i++) {
-    fileWCo >> j >> ch >> subCatchmentId >> correction;
+    fileWCo >> j >> ch >> subCatchmentId >> maxBas >> correction;
     if (j != i) {
       cout << endl << "Error reading file " << fileName << "\t" << i << "\t" << j << endl;
       exit (1);
     }
+    if (maxBas != 1.0) maxBasTransform = true;
     fileWCo.ignore(256,'\n');
     CatchmentElement[i].SetSubCatchmentIndex(i);
     CatchmentElement[i].SetIdentifier(subCatchmentId);
+    CatchmentElement[i].SetMaxBas(maxBas);
     CatchmentElement[i].SetCorrection(correction);
     CatchmentElement[i].AllocateAccumulatedDischarge(initialTimeSteps+numberTimeSteps);
     CatchmentElement[i].AllocateAccumulatedWaterBalance(initialTimeSteps+numberTimeSteps);
@@ -708,11 +713,6 @@ int main(int argc, char *argv[])
       cout <<" timeStep != initialTimeSteps+numberTimeSteps " << timeStep << "  " << initialTimeSteps+numberTimeSteps << endl << endl;
       exit(1);
     }
-    // Write discharge from all sub-catchment elements in sub-catchment hierarchy to output files
-    WriteSubCatchmentDischarge(CatchmentElement, numWatc, startSimulationTime, endSimulationTime, initialTimeSteps, 
-                               numberTimeSteps, ParGeneralStore->GetSECONDS_TIMESTEP(), modelCalibration, fout);
-    WriteSubCatchmentWaterBalance(CatchmentElement, numWatc, startSimulationTime, endSimulationTime, 
-                                  initialTimeSteps, numberTimeSteps, ParGeneralStore->GetSECONDS_TIMESTEP());
     delete InputTimeSeriesStore;
   }
 
@@ -760,14 +760,22 @@ int main(int argc, char *argv[])
       cout <<" timeStep != initialTimeSteps+numberTimeSteps " << timeStep << "  " << initialTimeSteps+numberTimeSteps << endl << endl;
       exit(1);
     }
-    // Write discharge from all sub-catchment elements in sub-catchment hierarchy to output files
-    WriteSubCatchmentDischarge(CatchmentElement, numWatc, startSimulationTime, endSimulationTime, initialTimeSteps, 
-                               numberTimeSteps, ParGeneralStore->GetSECONDS_TIMESTEP(), modelCalibration, fout);
-    WriteSubCatchmentWaterBalance(CatchmentElement, numWatc, startSimulationTime, endSimulationTime, 
-                                  initialTimeSteps, numberTimeSteps, ParGeneralStore->GetSECONDS_TIMESTEP());
     delete [] precip10;
     delete [] temp10K;
   }
+
+  //Transform discharge from sub-catchments with triangular weight function
+  if (maxBasTransform) {
+    for (i=0; i<numWatcOut; i++) {
+      TraverseMaxBas(Outlet[i], initialTimeSteps, numberTimeSteps, fout);
+    }
+  }
+  
+  // Write discharge from all sub-catchment elements in sub-catchment hierarchy to output files
+  WriteSubCatchmentDischarge(CatchmentElement, numWatc, startSimulationTime, endSimulationTime, initialTimeSteps, 
+			     numberTimeSteps, ParGeneralStore->GetSECONDS_TIMESTEP(), modelCalibration, fout);
+  WriteSubCatchmentWaterBalance(CatchmentElement, numWatc, startSimulationTime, endSimulationTime, 
+				initialTimeSteps, numberTimeSteps, ParGeneralStore->GetSECONDS_TIMESTEP());
 
   // Write model state variables
   if (writeModelStates) { 
@@ -1057,10 +1065,10 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
   strcpy(tempFileName,metPath);
   strcat(precFileName,"/rr/");
   strcat(tempFileName,"/tm/");
-  //if (datetime.getMonth() < 9)
+  //  if (datetime.getMonth() < 9)
     sprintf(hydYear,"%04d",datetime.getYear());
-  /*else
-    sprintf(hydYear,"%04d",datetime.getYear()+1);*/
+    /*  else
+	sprintf(hydYear,"%04d",datetime.getYear()+1);*/
   strcat(precFileName,hydYear);
   strcat(tempFileName,hydYear);
   sprintf(fileName,"/tm_%04d_%02d_%02d.bil",datetime.getYear(),datetime.getMonth(),datetime.getDay());
@@ -1231,6 +1239,114 @@ void TraverseCorrectionLandScape(DistributedHbv * const thisElement, double prec
 {
   thisElement->SetPrecipitationCorrection(precCorr);
   thisElement->SetTemperatureCorrection(tempCorr);
+}
+
+
+void TraverseMaxBas(SubCatchment * const thisSubCatchment, int initialTimeSteps, int numberTimeSteps, ofstream &fout)
+{
+  int i;
+  for (i=0; i<thisSubCatchment->GetNumUpStream(); i++) {
+    TraverseMaxBas(thisSubCatchment->GetUpStream(i), initialTimeSteps, numberTimeSteps, fout);
+  }
+  TransformMaxBas(thisSubCatchment, initialTimeSteps, numberTimeSteps, fout); 
+}
+
+
+void TransformMaxBas(SubCatchment * const thisSubCatchment, int initialTimeSteps, int numberTimeSteps, ofstream &fout)
+{
+  int i, j, index=0;
+  int maxBasNumber, maxBasInt, maxHalfInt;
+  double maxBas, maxHalf, sumWeight=0;
+  double routRunoff;
+
+  maxBas = thisSubCatchment->GetMaxBas();
+
+  if ((int)maxBas == maxBas)
+    maxBasNumber = (int)maxBas;
+  else
+    maxBasNumber = (int)maxBas+1;
+  cout << "\n maxBasNumber = " << maxBasNumber;
+  double * runoffWeight = new double[maxBasNumber+1];
+  
+  maxBasInt = (int)maxBas;
+  maxHalf = maxBas/2;
+  maxHalfInt = (int)maxBas/2;
+
+  cout << "      maxBas = " << maxBas << "\t maxBasInt = " << maxBasInt;
+  cout << "      maxHalf = " << maxHalf << "\t maxHalfInt = " << maxHalfInt;
+
+  if (maxBas >= 1.0) {
+    if (maxBasInt == maxBas) {
+      cout << "\n maxBasInt == maxBas";
+      if (maxHalfInt == maxHalf) {
+	cout << "\n maxHalfInt == maxHalf";
+	for (i=1; i<=maxHalfInt; i++) {
+	  index++;
+	  runoffWeight[index] = MaxBasWeight(i-1,i,maxBas);
+	}
+	for (i=maxHalfInt+1; i<=maxBasInt; i++) {
+	  index++;
+	  runoffWeight[index] = MaxBasWeight(i-1,i,maxBas);
+	}
+      } else {
+	cout << "\n maxHalfInt != maxHalf";
+	for (i=1; i<=maxHalfInt; i++) {
+	  index++;
+	  runoffWeight[index] = MaxBasWeight(i-1,i,maxBas);
+	}
+	index++;
+	runoffWeight[index] = MaxBasWeight(maxHalfInt,maxHalf,maxBas);
+	runoffWeight[index] = runoffWeight[index] + MaxBasWeight(maxHalf,maxHalfInt+1,maxBas);
+	for (i=maxHalfInt+2; i<=maxBasInt; i++) {
+	  index++;
+	  runoffWeight[index] = MaxBasWeight(i-1,i,maxBas);
+	}
+      }
+    } else {
+      cout << "\n maxBasInt != maxBas";
+      for (i=1; i<=maxHalfInt; i++) {
+	index++;
+	runoffWeight[index] = MaxBasWeight(i-1,i,maxBas);
+      }
+      index++;
+      runoffWeight[index] = MaxBasWeight(maxHalfInt,maxHalf,maxBas);
+      runoffWeight[index] = runoffWeight[index] + MaxBasWeight(maxHalf,maxHalfInt+1,maxBas);
+      for (i=maxHalfInt+2; i<=maxBasInt; i++) {
+	index++;
+	runoffWeight[index] = MaxBasWeight(i-1,i,maxBas);
+      }
+      index++;
+      runoffWeight[index] = MaxBasWeight(maxBasInt,maxBas,maxBas);
+    }
+  } else {
+    index = 1;
+    runoffWeight[index] = 1.0;
+  }
+
+  if (index != maxBasNumber) {
+    cout << "\n\n Error in function TransformRunoff, index " << index << "\t" 
+	 << "maxBasNumber " << maxBasNumber << endl << endl;
+    //    exit(1);
+  }
+
+  for (i=1; i<= maxBasNumber; i++) {
+    cout << "\n " << i << "\t" << runoffWeight[i];
+    sumWeight = sumWeight + runoffWeight[i];
+  }
+  cout << "\n sumWeight = " << sumWeight << endl;
+
+  for (j=maxBasNumber-1; j<initialTimeSteps+numberTimeSteps; j++) {
+    routRunoff = 0.0;
+    for (i=1; i<= maxBasNumber; i++) {
+      routRunoff = routRunoff + runoffWeight[i] * thisSubCatchment->GetAccumulatedDischarge(j-i+1);
+      if (thisSubCatchment->GetAccumulatedDischarge(j-i+1) <= missingData || routRunoff <= missingData) routRunoff = missingData;
+      if (routRunoff > missingData && routRunoff < 0.0) routRunoff = 0.0;
+    }
+    thisSubCatchment->SetAccumulatedDischarge(j, routRunoff);
+    //    cout << routRunoff << endl;
+  }
+
+  delete [] runoffWeight;
 }
 
 

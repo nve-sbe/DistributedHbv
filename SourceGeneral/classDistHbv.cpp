@@ -996,6 +996,7 @@ double HbvAquifer::GetRunoff() const
 SubCatchment::SubCatchment():
   numUpStream(0),
   numLandScape(0),
+  maxBas(1.0),
   correction(0.0)
 {
   UpStream = 0;

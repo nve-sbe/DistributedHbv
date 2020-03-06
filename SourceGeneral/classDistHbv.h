@@ -652,6 +652,8 @@ public:
   int GetNumLandScape() const { return numLandScape; }
   void SetLandScapeElement(DistributedHbv *theElement) { landScapeElement = theElement; }
   DistributedHbv *GetLandScapeElement() const { return landScapeElement; }
+  void SetMaxBas(double value) { maxBas = value; }
+  double GetMaxBas() const { return maxBas; }
   void SetCorrection(double value) { correction = value; }
   double GetCorrection() const { return correction; }
   void AllocateAccumulatedDischarge(int numberTimeSteps); 
@@ -743,6 +745,7 @@ private:
   int identifier;
   int numUpStream;
   int numLandScape;
+  double maxBas;
   double correction;
   double *accumulatedDischarge;
   double *accumulatedPrecipitation;

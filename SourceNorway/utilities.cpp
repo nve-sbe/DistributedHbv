@@ -113,3 +113,23 @@ double HBVTranspSoilEvapLongTermMean(double soilMoist, double temp, double epotP
 }
 
 
+// MaxBas triangular weight
+double MaxBasWeight(double lower, double upper, double maxBas)
+{
+  return (MaxBasFunction(lower,maxBas) + MaxBasFunction(upper,maxBas)) * (upper-lower)/2.0;
+}
+
+
+// MaxBas triangular function
+double MaxBasFunction(double argument, double maxBas)
+{
+  return (2.0/maxBas) - absValue(argument-(maxBas/2.0)) * (4.0/(maxBas*maxBas));
+}
+
+
+// Absolute value
+double absValue(double value)
+{
+  if (value >= 0) return value;
+  else return -value;
+}

@@ -17,3 +17,6 @@ double potentialEvapTemperatureIndex(double temp, double epotPar);
 double HBVTranspSoilEvapTemperatureIndex(double soilMoist, double temp, double epotPar, double fieldCapacity, double fcDel);
 double potentialEvapLongTermMean(double temp, double potentialEvaporation);
 double HBVTranspSoilEvapLongTermMean(double soilMoist, double temp, double epotPar, double fieldCapacity, double fcDel, double potentialEvaporation);
+double MaxBasWeight(double, double, double);
+double MaxBasFunction(double, double);
+double absValue(double);
