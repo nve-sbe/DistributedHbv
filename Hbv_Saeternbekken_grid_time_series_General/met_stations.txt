@@ -1,0 +1,11 @@
+Number of precipitation stations : 4
+Number of temperature stations   : 4
+P   5608         0.0        0.0  205.0        SAETERNBEKKEN
+P   5608      2500.0        0.0  205.0        SAETERNBEKKEN
+P   5608         0.0     4000.0  205.0        SAETERNBEKKEN
+P   5608      2500.0     4000.0  205.0        SAETERNBEKKEN
+T   5608         0.0        0.0  205.0        SAETERNBEKKEN
+T   5608      2500.0        0.0  205.0        SAETERNBEKKEN
+T   5608         0.0     4000.0  205.0        SAETERNBEKKEN
+T   5608      2500.0     4000.0  205.0        SAETERNBEKKEN
+

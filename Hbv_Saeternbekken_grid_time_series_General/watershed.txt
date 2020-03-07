@@ -1,0 +1,8 @@
+# Number of watercourses: 3
+0 :  80001    1.0    1.0
+1 :  80002    1.0    1.0 
+2 :  80003    1.0    1.0 
+# Number of watercourse outlets: 1
+2
+# Hierarchy of watercourses
+2 2 :  0 1

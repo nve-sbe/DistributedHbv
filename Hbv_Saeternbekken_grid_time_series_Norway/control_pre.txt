@@ -1,0 +1,12 @@
+Output file name                                       : pre_out.txt
+File with meteorological stations                      : met_stations.txt
+File with common parameters                            : hbv_common_parameters.txt
+File with geographical analysis area                   : stations.asc
+File with grid cell elevations                         : elevation.asc
+File with lake percentage                              : lake_percent.asc
+File with forest percentage                            : forest_percent.asc
+File with bog percentage                               : wetland_percent.asc
+File with glacier percentage                           : glacier_percent.asc
+File with tree levels                                  : tree_level.asc
+File with sub-catchment hierarchy                      : watershed.txt
+File with watercourse/sub-catchment identifiers        : watercourse_id.asc

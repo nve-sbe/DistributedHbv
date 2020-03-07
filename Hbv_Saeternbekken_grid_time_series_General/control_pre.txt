@@ -1,0 +1,29 @@
+Output file name                                       : pre_out.txt
+File with meteorological stations                      : met_stations.txt
+File with common parameters                            : hbv_common_parameters.txt
+File with geographical analysis area                   : stations.asc
+File with grid cell elevations                         : elevation.asc
+File with lake percentage                              : lake_percent.asc
+File with class 0 forest land surface percentage       : forest_percent.asc    
+File with class 1 bog land surface percentage          : wetland_percent.asc	    
+File with class 2 land surface percentage              : mountain_percent.asc     
+File with class 3 land surface percentage              : zerogrid.asc     
+File with class 4 land surface percentage              : zerogrid.asc     
+File with class 5 land surface percentage              : zerogrid.asc     
+File with class 6 land surface percentage              : zerogrid.asc     
+File with class 7 land surface percentage              : zerogrid.asc     
+File with class 8 land surface percentage              : zerogrid.asc     
+File with class 9 land surface percentage              : zerogrid.asc     
+File with class 10 land surface percentage             : zerogrid.asc     
+File with class 10 land surface percentage             : zerogrid.asc     
+File with class 12 land surface percentage             : zerogrid.asc     
+File with class 13 land surface percentage             : zerogrid.asc     
+File with class 14 land surface percentage             : zerogrid.asc     
+File with class 15 land surface percentage             : zerogrid.asc     
+File with class 16 land surface percentage             : zerogrid.asc     
+File with class 17 land surface percentage             : zerogrid.asc     
+File with class 18 land surface percentage             : zerogrid.asc     
+File with class 19 land surface percentage             : zerogrid.asc     
+File with glacier percentage                           : glacier_percent.asc
+File with sub-catchment hierarchy                      : watershed.txt
+File with watercourse/sub-catchment identifiers        : watercourse_id.asc
