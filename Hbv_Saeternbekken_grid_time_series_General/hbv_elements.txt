@@ -1,4 +1,3 @@
-# Number of landscape elements selected for time series output: 3
- 0
-16
+# Number of landscape elements selected for time series output: 2
+0
 25

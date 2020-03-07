@@ -63,9 +63,8 @@ Subsurface parameters:
 0.3799    2    1    50    1    1.87403    0.0001    0.0130651    0
 
 
-Number of landscape elements selected for time series output: 3
+Number of landscape elements selected for time series output: 2
 0
-16
 25
 
 Precipitation and temperature correction for catchments: 
