@@ -1,23 +1,23 @@
-Number of seconds per time step    SECONDS_TIMESTEP: 3600
-Number of precipitation series     NUM_PREC_SERIES : 1
-Number of temperature series       NUM_TEMP_SERIES : 1
-Prec. grad. low  per 100 m         PREC_GRAD       : 1.04812500 
-Prec. grad. high per 100 m         PREC_GRAD       : 1.0 
-Altitude for 50 % reduction        GRAD_CHANGE_ALT : 0
-Prec. correction for rain          PREC_CORR_RAIN  : 1.0
-Additional prec. corr. for snow    PREC_CORR_SNOW  : 1.0
-Temp. lapse rate dry days          LAPSE_DRY       : -.20674130 
-Temp. lapse rate precip. days      LAPSE_WET       : -.20674130 
-Lake temperature memory (days)     DAY_TEMP_MEMORY : 30.0
-Lake evaporation constant          LAKE_EPOT_PAR   : 1.00730E-4
-Rating curve constant              KLAKE           : .002463478
-Rating curve saddle point (m)      DELTA_LEVEL     : 0.0
-Rating curve exponent              NLAKE           : 1.0
-Initial soil moisture        INITIAL_SOIL_MOISTURE : 0.1
-Initial upper zone           INITIAL_UPPER_ZONE    : 0.0
-Initial lower zone           INITIAL_LOWER_ZONE    : .05
+Number of seconds per time step    SECONDS_TIMESTEP    : 3600
+Number of precipitation series     NUM_PREC_SERIES     : 1
+Number of temperature series       NUM_TEMP_SERIES     : 1
+Prec. grad. low  per 100 m         PREC_GRAD           : 1.04812500 
+Prec. grad. high per 100 m         PREC_GRAD           : 1.0 
+Altitude for 50 % reduction        GRAD_CHANGE_ALT     : 0
+Prec. correction for rain          PREC_CORR_RAIN      : 1.0
+Additional prec. corr. for snow    PREC_CORR_SNOW      : 1.0
+Temp. lapse rate dry days          LAPSE_DRY           : -.20674130 
+Temp. lapse rate precip. days      LAPSE_WET           : -.20674130 
+Lake temperature memory (days)     DAY_TEMP_MEMORY     : 30.0
+Lake evaporation constant          LAKE_EPOT_PAR       : 1.00730E-4
+Rating curve constant              KLAKE               : .002463478
+Rating curve saddle point (m)      DELTA_LEVEL         : 0.0
+Rating curve exponent              NLAKE               : 1.0
+Initial soil moisture        INITIAL_SOIL_MOISTURE     : 0.1
+Initial upper zone           INITIAL_UPPER_ZONE        : 0.0
+Initial lower zone           INITIAL_LOWER_ZONE        : .05
 Initial lake temperature     INITIAL_LAKE_TEMP         : 0.0
 Initial lake level           INITIAL_LAKE_LEVEL        : 0.0
 Initial snow storage         INITIAL_SNOW_STORAGE      : 0.0
 Initial total Reservoir      INITIAL_TOTAL_RESERVOIR   : 0.0
-DDay no. for zero snow storage      DAY_SNOW_ZERO   : 319
+DDay no. for zero snow storage      DAY_SNOW_ZERO      : 0
