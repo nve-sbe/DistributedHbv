@@ -1,5 +1,5 @@
 
-#All data zone UTM33
+All data zone UTM33
 
 elevation.asc            Elevation of grid cells (metres above sea level)
 forest_percent.asc	 Forest cover percent in grid cells
