@@ -1,6 +1,6 @@
 
 Documentation for model versions
 
-DistributedHbv_2.16_General
-DistributedHbv_2.16_Norway
+Distributed_Hbv_General 2.16
+Distributed_Hbv_Norway  2.16
 
