@@ -659,6 +659,9 @@ public:
   void AllocateAccumulatedDischarge(int numberTimeSteps); 
   void SetAccumulatedDischarge(int index, double value) { accumulatedDischarge[index] = value; }
   double GetAccumulatedDischarge(int index) const { return accumulatedDischarge[index]; }
+  void AllocateAccumulatedInFlow(int numberTimeSteps);
+  void SetAccumulatedInFlow(int index, double value) { accumulatedInFlow[index] = value; }
+  double GetAccumulatedInFlow(int index) const { return accumulatedInFlow[index]; }
   void AllocateAccumulatedWaterBalance(int numberTimeSteps); 
   void AllocateWaterBalance(int numberTimeSteps); 
   void SetAccumulatedPrecipitation(int index, double value) { accumulatedPrecipitation[index] = value; }
@@ -748,6 +751,7 @@ private:
   double maxBas;
   double correction;
   double *accumulatedDischarge;
+  double *accumulatedInFlow;
   double *accumulatedPrecipitation;
   double *accumulatedTemperature;
   double *accumulatedLakeStorage;

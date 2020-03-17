@@ -1019,6 +1019,11 @@ void SubCatchment::AllocateAccumulatedDischarge(int numberTimeSteps)
   accumulatedDischarge = new double [numberTimeSteps];
 }
 
+void SubCatchment::AllocateAccumulatedInFlow(int numberTimeSteps)
+{
+  accumulatedInFlow = new double[numberTimeSteps];
+}
+
 void SubCatchment::AllocateAccumulatedWaterBalance(int numberTimeSteps) 
 {
   accumulatedPrecipitation = new double [numberTimeSteps];

@@ -565,6 +565,7 @@ int main(int argc, char *argv[])
     CatchmentElement[i].SetMaxBas(maxBas);
     CatchmentElement[i].SetCorrection(correction);
     CatchmentElement[i].AllocateAccumulatedDischarge(initialTimeSteps+numberTimeSteps);
+    CatchmentElement[i].AllocateAccumulatedInFlow(initialTimeSteps+numberTimeSteps);
     CatchmentElement[i].AllocateAccumulatedWaterBalance(initialTimeSteps+numberTimeSteps);
     CatchmentElement[i].AllocateWaterBalance(initialTimeSteps+numberTimeSteps);
     CatchmentElement[i].ObsDataInput(fileObsStreamflow, startSimulationTime, endSimulationTime, numberTimeSteps, 
@@ -1067,8 +1068,8 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
   strcat(tempFileName,"/tm/");
   //  if (datetime.getMonth() < 9)
     sprintf(hydYear,"%04d",datetime.getYear());
-    /*  else
-	sprintf(hydYear,"%04d",datetime.getYear()+1);*/
+    //  else
+    //    sprintf(hydYear,"%04d",datetime.getYear()+1);
   strcat(precFileName,hydYear);
   strcat(tempFileName,hydYear);
   sprintf(fileName,"/tm_%04d_%02d_%02d.bil",datetime.getYear(),datetime.getMonth(),datetime.getDay());
@@ -1335,11 +1336,21 @@ void TransformMaxBas(SubCatchment * const thisSubCatchment, int initialTimeSteps
   }
   cout << "\n sumWeight = " << sumWeight << endl;
 
+  double * accumulatedRouteInput = new double[initialTimeSteps+numberTimeSteps];
+  for (j=0; j<initialTimeSteps+numberTimeSteps; j++) {
+    accumulatedRouteInput[j] = 0.0;
+    for (i=0; i<thisSubCatchment->GetNumUpStream(); i++)
+    {
+      accumulatedRouteInput[j] = accumulatedRouteInput[j] + thisSubCatchment->GetUpStream(i)->GetAccumulatedDischarge(j);
+    }
+    accumulatedRouteInput[j] = accumulatedRouteInput[j] + thisSubCatchment->GetAccumulatedInFlow(j);
+  }
+
   for (j=maxBasNumber-1; j<initialTimeSteps+numberTimeSteps; j++) {
     routRunoff = 0.0;
     for (i=1; i<= maxBasNumber; i++) {
-      routRunoff = routRunoff + runoffWeight[i] * thisSubCatchment->GetAccumulatedDischarge(j-i+1);
-      if (thisSubCatchment->GetAccumulatedDischarge(j-i+1) <= missingData || routRunoff <= missingData) routRunoff = missingData;
+      routRunoff = routRunoff + runoffWeight[i] * accumulatedRouteInput[j-i+1];
+      if (accumulatedRouteInput[j-i+1] <= missingData || routRunoff <= missingData) routRunoff = missingData;
       if (routRunoff > missingData && routRunoff < 0.0) routRunoff = 0.0;
     }
     thisSubCatchment->SetAccumulatedDischarge(j, routRunoff);
@@ -1347,6 +1358,7 @@ void TransformMaxBas(SubCatchment * const thisSubCatchment, int initialTimeSteps
   }
 
   delete [] runoffWeight;
+  delete [] accumulatedRouteInput;
 }
 
 
@@ -1364,6 +1376,7 @@ void TraverseSubCatchment(SubCatchment * const thisSubCatchment, int timeStep, o
   double subCatchmentSumGlacier=0.0;
   double subCatchmentSumHbv=0.0;
   double accumulatedDischarge=0.0;
+  double accumulatedInFlow=0.0;
   double accumulatedPrecipitation=0.0;
   double accumulatedTemperature=0.0;
   double accumulatedLakeStorage=0.0;
@@ -1434,6 +1447,7 @@ void TraverseSubCatchment(SubCatchment * const thisSubCatchment, int timeStep, o
     TraverseLandScape(thisElement, timeStep, fout);
     // Fluxes accumulated
     accumulatedDischarge=accumulatedDischarge+thisElement->GetAccumulatedDischarge();
+    accumulatedInFlow=accumulatedInFlow+thisElement->GetAccumulatedDischarge();
     accumulatedPrecipitation=accumulatedPrecipitation+thisElement->GetAccumulatedPrecipitation();
     accumulatedTemperature=accumulatedTemperature+thisElement->GetAccumulatedTemperature();
     accumulatedEvapotranspiration=accumulatedEvapotranspiration+thisElement->GetAccumulatedEvapotranspiration();
@@ -1492,6 +1506,7 @@ void TraverseSubCatchment(SubCatchment * const thisSubCatchment, int timeStep, o
   }
   // Fluxes accumulated
   thisSubCatchment->SetAccumulatedDischarge(timeStep, accumulatedDischarge);
+  thisSubCatchment->SetAccumulatedInFlow(timeStep, accumulatedInFlow);
   thisSubCatchment->SetAccumulatedPrecipitation(timeStep, accumulatedPrecipitation);
   thisSubCatchment->SetAccumulatedTemperature(timeStep, accumulatedTemperature);
   thisSubCatchment->SetAccumulatedEvapotranspiration(timeStep, accumulatedEvapotranspiration);
@@ -1751,6 +1766,7 @@ void TraverseMissingDataSubCatchment(SubCatchment * const thisSubCatchment, int 
     thisElement = thisElement->GetNextElement();
   }
   thisSubCatchment->SetAccumulatedDischarge(timeStep, missingData);
+  thisSubCatchment->SetAccumulatedInFlow(timeStep, missingData);
   thisSubCatchment->SetAccumulatedPrecipitation(timeStep, missingData);
   thisSubCatchment->SetAccumulatedTemperature(timeStep, missingData);
   thisSubCatchment->SetAccumulatedLakeStorage(timeStep, missingData);
