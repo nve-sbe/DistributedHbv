@@ -19,5 +19,4 @@ Initial lower zone           INITIAL_LOWER_ZONE        : .05
 Initial lake temperature     INITIAL_LAKE_TEMP         : 0.0
 Initial lake level           INITIAL_LAKE_LEVEL        : 0.00000000
 Initial snow storage         INITIAL_SNOW_STORAGE      : 0.0
-Initial total Reservoir      INITIAL_TOTAL_RESERVOIR   : 0.0
 Day no. for zero snow storage      DAY_SNOW_ZERO       : 0
