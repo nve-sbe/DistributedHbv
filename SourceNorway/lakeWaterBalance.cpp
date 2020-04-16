@@ -37,6 +37,11 @@ void LakeWaterBalance::WaterBalance(int timeStep, DateTime datetime)
   nLake = commonPar->GetNLAKE();
   kLake = commonPar->GetKLAKE();
 
+  /*  Lake water level minimum  */
+  if (waterLevel < (-1)*deltaLevel) {
+    lakeEvaporation = 0.0;
+  }
+
   /*  Initial lake water level  */
   stage = waterLevel + waterInput - lakeEvaporation;
 
@@ -50,13 +55,13 @@ void LakeWaterBalance::WaterBalance(int timeStep, DateTime datetime)
 
   /*  Final runoff  */
   newStage = stage - runoff;
-  if (runoff > 0.0) {                                  // New test added in order to allow lake evaporation to draw water below -deltaLevel
-    if (newStage + deltaLevel < 0.0) {
-      runoff = runoff + newStage + deltaLevel;
-      if (runoff < 0.0) runoff = 0.0;
-      newStage = (-1)*deltaLevel;
-    }
-  }
+  //  if (runoff > 0.0) {                                  // New test added in order to allow lake evaporation to draw water below -deltaLevel
+  //    if (newStage + deltaLevel < 0.0) {
+  //      runoff = runoff + newStage + deltaLevel;
+  //      if (runoff < 0.0) runoff = 0.0;
+  //      newStage = (-1)*deltaLevel;
+  //    }
+  //  }
 
   /*  Final lake water level and lake water level change  */
   waterLevelChange = newStage - waterLevel;

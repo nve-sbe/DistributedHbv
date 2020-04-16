@@ -110,7 +110,7 @@ Precipitation and temperature correction for catchments:
     Sub-catchment :  1220009
 
     Nash-Sutcliffe efficiency                           0.89
-    Root mean square error                              38.60
+    Root mean square error                              38.59
     Bias (volume error)                                 0.03
     Pearson's product-moment correlation coefficient    0.89
 

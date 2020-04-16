@@ -929,6 +929,7 @@ class DistributedHbv
   double GetSumPrecipitation() const;
   double GetSumEvapotranspiration() const;
   double GetSumRunoff() const;
+  double GetSumGlacierIceMelt() const;
   double GetLandArea() const;
   double GetLakeArea() const;
   double GetGlacierArea() const;
@@ -965,6 +966,7 @@ private:
   double sumPrecipitation;
   double sumEvapotranspiration;
   double sumRunoff;
+  double sumGlacierIceMelt;
   double accumulatedSum;
   double accumulatedSumLake;
   double accumulatedSumSnow;

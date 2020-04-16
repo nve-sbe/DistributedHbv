@@ -1179,7 +1179,8 @@ DistributedHbv::DistributedHbv():
   finalStorage(0),
   sumPrecipitation(0.0),
   sumEvapotranspiration(0.0),
-  sumRunoff(0.0)
+  sumRunoff(0.0),
+  sumGlacierIceMelt(0.0)
 {
   SetNextElement(0);
   SetLake(0);
@@ -1855,15 +1856,22 @@ void DistributedHbv::SetSumWaterBalance()
     sumPrecipitation = sumPrecipitation + GetPrecipitation();
     sumEvapotranspiration = sumEvapotranspiration + GetEvapotranspiration();
     sumRunoff = sumRunoff + GetRunoff();
+    sumGlacierIceMelt = sumGlacierIceMelt + GetGlacierIceMelt();
     numberSum++;
   }
 }
 
 void DistributedHbv::SetInitialStorage()
 {
+  initialStorage = GetSnowStore() + GetMeltWater();
   if (GetHbvAquifer()) {
-    initialStorage = initialStorage + GetSnowStore() + GetMeltWater() + GetHbvSoilMoisture() + GetHbvUpperZone() + GetHbvLowerZone() + GetLakeStorage();
-    //    initialStorage = initialStorage + GetSnowStore() + GetMeltWater() + GetHbvSoilMoisture() + GetHbvUpperZone() + GetHbvLowerZone() + GetLakeStorage() + GetGlacierIceThickness()*GetGeneralPar()->GetDENSITY_ICE();
+    initialStorage = initialStorage + GetHbvSoilMoisture() + GetHbvUpperZone() + GetHbvLowerZone() + GetLakeStorage();
+  }
+  if (GetLake()) {
+    initialStorage = initialStorage + GetLakeStorage();
+  }
+  if (GetGlacier()) {
+    initialStorage = initialStorage - GetSumGlacierIceMelt();
   }
 }
 
@@ -1874,9 +1882,15 @@ double DistributedHbv::GetInitialStorage() const
 
 void DistributedHbv::SetFinalStorage()
 {
+  finalStorage = GetSnowStore() + GetMeltWater();
   if (GetHbvAquifer()) {
-    finalStorage = finalStorage + GetSnowStore() + GetMeltWater() + GetHbvSoilMoisture() + GetHbvUpperZone() + GetHbvLowerZone() + GetLakeStorage();
-    //    finalStorage = finalStorage + GetSnowStore() + GetMeltWater() + GetHbvSoilMoisture() + GetHbvUpperZone() + GetHbvLowerZone() + GetLakeStorage() + GetGlacierIceThickness()*GetGeneralPar()->GetDENSITY_ICE();
+    finalStorage = finalStorage + GetHbvSoilMoisture() + GetHbvUpperZone() + GetHbvLowerZone() + GetLakeStorage();
+  }
+  if (GetLake()) {
+    finalStorage = finalStorage + GetLakeStorage();
+  }
+  if (GetGlacier()) {
+    finalStorage = finalStorage - GetSumGlacierIceMelt();
   }
 }
 
@@ -1898,5 +1912,10 @@ double DistributedHbv::GetSumEvapotranspiration() const
 double DistributedHbv::GetSumRunoff() const
 {
     return sumRunoff;
+}
+
+double DistributedHbv::GetSumGlacierIceMelt() const
+{
+    return sumGlacierIceMelt;
 }
 

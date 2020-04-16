@@ -784,7 +784,7 @@ int main(int argc, char *argv[])
   }
 
   // Write water balance grid
-  //  WriteAsciiGridWaterBalance(DistHbv, startSimulationTime, endSimulationTime, numLand, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout);
+  WriteAsciiGridWaterBalance(DistHbv, startSimulationTime, endSimulationTime, numLand, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout);
  
   // Write state variable time series for landscape elements selected for output
   WriteDistributedHbvTimeSeries(DistHbv, numLand, startSimulationTime, endSimulationTime, 
@@ -1038,9 +1038,9 @@ void WaterBalanceTimeSeries(DistributedHbv * const DistHbv, ParametersGeneral * 
               InputElementStore->SetInput(0,0.0);
               }*/
       DistHbv[i].WaterBalance(timeStep,datetime,initialTimeSteps,numberTimeSteps);
-      DistHbv[i].SetSumWaterBalance();
-      if (timeStep == initialTimeSteps) DistHbv[i].SetInitialStorage();
-      if (timeStep == numberTimeSteps) DistHbv[i].SetFinalStorage();
+      if (timeStep == initialTimeSteps-1) DistHbv[i].SetInitialStorage();
+      if (timeStep >= initialTimeSteps) DistHbv[i].SetSumWaterBalance();
+      if (timeStep == initialTimeSteps+numberTimeSteps-1) DistHbv[i].SetFinalStorage();
     }
     else {
       *inputDataFound=false;
@@ -1156,11 +1156,11 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
               DistHbv[k].SetSnowStore(0.0);
               //      DistHbv[k].SetSubSurfaceHBVStore(0.2,0.0,0.05);
           }*/
-          DistHbv[k].WaterBalance(timeStep,datetime,initialTimeSteps,numberTimeSteps);
 	  // Water balance grid values
-	  /*	  DistHbv[i].SetSumWaterBalance();
-	  if (timeStep == initialTimeSteps) DistHbv[i].SetInitialStorage();
-	  if (timeStep == numberTimeSteps) DistHbv[i].SetFinalStorage();*/
+          DistHbv[k].WaterBalance(timeStep,datetime,initialTimeSteps,numberTimeSteps);
+	  if (timeStep == initialTimeSteps-1) DistHbv[k].SetInitialStorage();
+	  if (timeStep >= initialTimeSteps) DistHbv[k].SetSumWaterBalance();
+	  if (timeStep == initialTimeSteps+numberTimeSteps-1) DistHbv[k].SetFinalStorage();
           k++;
         }
       }
@@ -3233,7 +3233,7 @@ void WriteAsciiGridWaterBalance(DistributedHbv * const DistHbv, DateTime startSi
 		    {
 		        fileEvap.width(15); 
 			fileEvap << noData << endl;
-                     }
+		    }
 		    k++;
 		}
 		else 
@@ -3339,7 +3339,7 @@ void WriteAsciiGridWaterBalance(DistributedHbv * const DistHbv, DateTime startSi
                         fileChange.precision(5); 
                         fileChange.setf(ios::showpoint); 
                         fileChange.setf(ios::fixed); 
-                        fileChange << (DistHbv[k].GetFinalStorage()-DistHbv[k].GetInitialStorage())*1000.0 << endl;
+                        fileChange << (DistHbv[k].GetFinalStorage()-DistHbv[k].GetInitialStorage())/DistHbv[k].GetNumberSum()*numberDaysPerYear*1000.0 << endl;
                     }
                     else 
                     {
