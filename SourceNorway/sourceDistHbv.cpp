@@ -1066,10 +1066,10 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
   strcpy(tempFileName,metPath);
   strcat(precFileName,"/rr/");
   strcat(tempFileName,"/tm/");
-  //  if (datetime.getMonth() < 9)
+  if (datetime.getMonth() < 9)
     sprintf(hydYear,"%04d",datetime.getYear());
-    //  else
-    //    sprintf(hydYear,"%04d",datetime.getYear()+1);
+  else
+    sprintf(hydYear,"%04d",datetime.getYear()+1);
   strcat(precFileName,hydYear);
   strcat(tempFileName,hydYear);
   sprintf(fileName,"/tm_%04d_%02d_%02d.bil",datetime.getYear(),datetime.getMonth(),datetime.getDay());
