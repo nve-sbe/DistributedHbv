@@ -33,7 +33,7 @@ Common parameters:
 0
 0
 0
-243
+0
 
 Land surface parameters: 
 0.000500317    1.03731e-05    0.8    0    0.0943445    0.00334668    0.005    0.01    0.08    0.9    0
