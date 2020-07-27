@@ -2302,11 +2302,12 @@ void WriteBinaryGrid(DistributedHbv * const DistHbv, DateTime datetime, int numL
       for (j=0; j<nCols; j++) {*/
   while (k<numLand) {
 //      if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-    if (DistHbv[k].GetInterceptionLoss() > missingData &&
-        DistHbv[k].GetTranspSoilEvap() > missingData &&
-        DistHbv[k].GetLakeEvap() > missingData)
+//      if (DistHbv[k].GetInterceptionLoss() > missingData &&
+//        DistHbv[k].GetTranspSoilEvap() > missingData &&
+//        DistHbv[k].GetLakeEvap() > missingData)
       //      eva[k] = (float) ((DistHbv[k].GetInterceptionLoss() + DistHbv[k].GetTranspSoilEvap() + 
       //                         DistHbv[k].GetLakeEvap())*1000.0);
+    if (DistHbv[k].GetEvapotranspiration() > missingData) 
       eva[k] = (float) ((DistHbv[k].GetEvapotranspiration())*1000.0);
     else
       eva[k] = (float) noData;
@@ -2747,9 +2748,10 @@ void WriteAsciiGrid(DistributedHbv * const DistHbv, DateTime datetime, int numLa
     for (j=0; j<nCols; j++) {
       if (k<numLand) {
         if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-          if (DistHbv[k].GetInterceptionLoss() > missingData &&
-              DistHbv[k].GetTranspSoilEvap() > missingData &&
-              DistHbv[k].GetLakeEvap() > missingData) {
+	  //          if (DistHbv[k].GetInterceptionLoss() > missingData &&
+	  //              DistHbv[k].GetTranspSoilEvap() > missingData &&
+	  //              DistHbv[k].GetLakeEvap() > missingData) {
+	  if (DistHbv[k].GetEvapotranspiration() > missingData) {
             fileEvap.width(15); fileEvap.precision(5); fileEvap.setf(ios::showpoint); fileEvap.setf(ios::fixed); 
 	    //            fileEvap << (DistHbv[k].GetInterceptionLoss() + DistHbv[k].GetTranspSoilEvap() + 
 	    //                         DistHbv[k].GetLakeEvap())*1000.0 << endl;
