@@ -11,3 +11,4 @@ Precipitation-runoff models are used for applications that require simulation of
 ## References 
 Beldring, S., Engeland, K., Roald, L.A., Sælthun, N.R., Voksø, A. 2003. Estimation of parameters in a distributed precipitation-runoff model for Norway. Hydrology and Earth System Sciences 7, 304-316. https://doi.org/10.5194/hess-7-304-2003
 
+All users of this software shall be responsible for their own applications and for its application by their partners or employees
