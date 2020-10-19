@@ -784,7 +784,7 @@ int main(int argc, char *argv[])
   }
 
   // Write water balance grid
-  WriteAsciiGridWaterBalance(DistHbv, startSimulationTime, endSimulationTime, numLand, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout);
+  //  WriteAsciiGridWaterBalance(DistHbv, startSimulationTime, endSimulationTime, numLand, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout);
  
   // Write state variable time series for landscape elements selected for output
   WriteDistributedHbvTimeSeries(DistHbv, numLand, startSimulationTime, endSimulationTime, 
