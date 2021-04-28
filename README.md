@@ -11,5 +11,9 @@ Precipitation-runoff models are used for applications that require simulation of
 ## References 
 Beldring, S., Engeland, K., Roald, L.A., Sælthun, N.R., Voksø, A. 2003. Estimation of parameters in a distributed precipitation-runoff model for Norway. Hydrology and Earth System Sciences 7, 304-316. https://doi.org/10.5194/hess-7-304-2003
 
+Huang, S., Eisner, S., Magnusson, J., Lussana, C., Yang, X., Beldring, S. 2019. Improvements of the spatially distributed hydrological modelling using the HBV model at 1 km resolution for Norway. Journal of Hydrology 557:123585, https://doi.org/10.1016/j.jhydrol.2019.03.051
+
+Erlandsen, H.B., Beldring, S., Eisner, S., Hisdal, H., Huang, S., Tallaksen, L.M. 2021. Constraining the HBV model for robust water balance assessments in a cold climate. Hydrology Research nh2021132, https://doi.org/10.2166/nh.2021.132 
+
 ## Liability disclaimer
 This software is provided by the provider "as is" and "with all faults" without warranty of any kind, either express or implied. By downloading this software you agree that the use of the software is done at your own risk and with agreement that you will be solely responsible for any damage to your computer system or loss of data that results from such activities. In no event shall the provider be liable to you or any third parties for any special, punitive, incidental, indirect or consequential damages of any kind, or any damages whatsoever, including, without limitation, those resulting from loss of use, data or profits, and on any theory of liability, arising out of or in connection with the use of this software.
