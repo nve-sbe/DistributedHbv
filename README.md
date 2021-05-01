@@ -11,7 +11,13 @@ Precipitation-runoff models are used for applications that require simulation of
 ## References 
 Beldring, S., Engeland, K., Roald, L.A., Sælthun, N.R., Voksø, A. 2003. Estimation of parameters in a distributed precipitation-runoff model for Norway. Hydrology and Earth System Sciences 7, 304-316. https://doi.org/10.5194/hess-7-304-2003
 
+Beldring, S., Engen-Skaugen, T., Førland, E.J., Roald, L.A. 2008. Climate change impacts on hydrological processes in Norway based on two methods for transferring regional climate model results to meteorological station sites. Tellus 60A, 439–450, https://onlinelibrary.wiley.com/doi/10.1111/j.1600-0870.2008.00306.x
+
+Wong, W.K., Beldring, S., Engen-Skaugen, T., Haddeland, I., Hisdal, H. 2011. Climate change effects on spatiotemporal patterns of hydroclimatological summer droughts in Norway. Journal of Hydrometeorology 12, 1205-1220, http://dx.doi.org/10.1175/2011JHM1357.1
+
 Huang, S., Eisner, S., Magnusson, J., Lussana, C., Yang, X., Beldring, S. 2019. Improvements of the spatially distributed hydrological modelling using the HBV model at 1 km resolution for Norway. Journal of Hydrology 557:123585, https://doi.org/10.1016/j.jhydrol.2019.03.051
+
+Grover, S., Tayal, S., Beldring, S., Li, H. 2020. Modeling Hydrological Processes in Ungauged Snow-Fed Catchment of Western Himalaya. Water Resources 47(6), 987–995, https://doi.org/10.1134/S0097807820060147
 
 Erlandsen, H.B., Beldring, S., Eisner, S., Hisdal, H., Huang, S., Tallaksen, L.M. 2021. Constraining the HBV model for robust water balance assessments in a cold climate. Hydrology Research nh2021132, https://doi.org/10.2166/nh.2021.132 
 
