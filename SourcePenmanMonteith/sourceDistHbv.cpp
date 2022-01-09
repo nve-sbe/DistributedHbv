@@ -1284,8 +1284,8 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
 			  vp = (double)vp10[indexStore[i]] / 1000.0/10.0;   // unit: K Pa
 			  //      printf("%d  %f  %f\n",ELEMENT(i,j),precipitation,temperature);
 
-			  preci_corr = precipitation/((0.82-(0.81*exp((temperature-0.66)/1.07))/(1+exp((temperature-0.66)/1.07)))*exp(-pow((wind/4.24),1.81))
-                                  +(0.81*exp((temperature-0.66)/1.07))/(1+exp((temperature-0.66)/1.07))+0.18);
+			  /*			  preci_corr = precipitation/((0.82-(0.81*exp((temperature-0.66)/1.07))/(1+exp((temperature-0.66)/1.07)))*exp(-pow((wind/4.24),1.81))
+						  +(0.81*exp((temperature-0.66)/1.07))/(1+exp((temperature-0.66)/1.07))+0.18);*/
 
 			  if(temperature < 0.5) {
 			    preci_corr = ParGeneralStore->GetPREC_CORR_SNOW()*preci_corr ;
