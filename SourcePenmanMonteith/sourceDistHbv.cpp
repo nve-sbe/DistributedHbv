@@ -1287,8 +1287,9 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
 			  /*			  preci_corr = precipitation/((0.82-(0.81*exp((temperature-0.66)/1.07))/(1+exp((temperature-0.66)/1.07)))*exp(-pow((wind/4.24),1.81))
 						  +(0.81*exp((temperature-0.66)/1.07))/(1+exp((temperature-0.66)/1.07))+0.18);*/
 
+			  preci_corr = precipitation;
 			  if(temperature < 0.5) {
-			    preci_corr = ParGeneralStore->GetPREC_CORR_SNOW()*preci_corr ;
+			    preci_corr = ParGeneralStore->GetPREC_CORR_RAIN()*ParGeneralStore->GetPREC_CORR_SNOW()*preci_corr ;
 			  } else {
 			    preci_corr = ParGeneralStore->GetPREC_CORR_RAIN()*preci_corr ;
 			  }
