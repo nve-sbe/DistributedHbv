@@ -11,8 +11,5 @@ prehbv:	$(OBJSP)
 stationMask:	sourceStationMask.cpp 
 		$(C++C) $(C++FLAGS) sourceStationMask.cpp -o stationMask
 
-mask:	sourceMask.cpp 
-	$(C++C) $(C++FLAGS) sourceMask.cpp -o mask
-
 clean:
 	rm -f $(OBJSD) $(OBJSP) *.o core
