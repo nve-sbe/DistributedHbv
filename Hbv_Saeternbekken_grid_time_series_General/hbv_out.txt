@@ -110,7 +110,9 @@ Number of landscape elements selected for time series output: 2
 25
 
 Precipitation and temperature correction for catchments: 
-0  80003  1  0
+0  80001  1  0
+1  80002  1  0
+2  80003  1  0
 80001   precCorr  1    tempCorr  0
 80002   precCorr  1    tempCorr  0
 80003   precCorr  1    tempCorr  0

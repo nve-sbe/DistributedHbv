@@ -1,2 +1,4 @@
 Catchment id.   Precipitation correction    Temperature correction
+80001           1.0                         0.0             
+80002           1.0                         0.0             
 80003           1.0                         0.0             
