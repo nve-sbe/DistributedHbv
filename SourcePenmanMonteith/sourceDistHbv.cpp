@@ -10,6 +10,17 @@
 #include "classDistHbv.h"
 #include "parameters.h"
 #include "utilities.h"
+#include "netcdf.h"
+
+#ifndef FALSE
+#define FALSE 0
+#define TRUE !FALSE
+#endif
+
+#define NODATA 1.e+20f  //nodata in .nc files made for KSS. (HySN5, land masks and climate projections)
+#define NPARAM 4
+#define S_PR_DAY 86400
+#define KELVIN 273.15
 
 void ReadSubCatchmentIdentifier(DistributedHbv * const DistHbv, SubCatchment * const CatchmentElement,
                                 int numWatc, ifstream &fileControl, ofstream &fout);
@@ -22,11 +33,36 @@ void WaterBalanceTimeSeries(DistributedHbv * const DistHbv, ParametersGeneral * 
                             int numLand, int timeStep, DateTime datetime, bool * inputDataFound);
 void WaterBalanceGrid(DistributedHbv * const DistHbv,  ParametersGeneral * ParGeneralStore, 
                       InputElement * InputElementStore, int initialTimeSteps, int numberTimeSteps,
-                      int numLand, int timeStep, int nRows, int nCols, DateTime datetime, char * metPath,
+                      int numLand, int timeStep, int nRows, int nCols, DateTime datetime, char * precPath,
                       unsigned short int * precip10, unsigned short int * temp10K, unsigned short int * tmax10K, 
 		      unsigned short int * tmin10K, unsigned short int * wind10, unsigned short int * solar10, 
 	              unsigned short int * vp10,  bool * inputDataFound,
                       int * indexStore, int numberIndexStore, ofstream &fout);
+void WaterBalanceGridNetcdf(DistributedHbv * const DistHbv,  ParametersGeneral * ParGeneralStore, 
+			    InputElement * InputElementStore, int initialTimeSteps, int numberTimeSteps,
+			    int numLand, int timeStep, int nRows, int nCols, DateTime datetime,
+			    float *prec_in, float *temp_in, float *tmax_in, 
+			    float *tmin_in, float *wind_in, float *srad_in, 
+			    float *vp_in, bool * inputDataFound,
+			    int * indexStore, int numberIndexStore, ofstream &fout);
+void ReadNetcdf(int initialTimeSteps, int numberTimeSteps,
+		int numLand, int timeStep, int nRows, int nCols, 
+		DateTime datetime,char ETscheme,
+		char * precPath,char * tmeanPath, char *tmaxPath,
+		char * tminPath,char *windPath,char * metPath3,
+		float *prec_in, float *temp_in, float *tmax_in, 
+		float *tmin_in, float *wind_in, float *srad_in, 
+		float *vp_in,float *hurs_in);
+void ReadNetcdfClimateProj(int initialTimeSteps, int numberTimeSteps,
+			   int numLand, int timeStep, int nRows, int nCols, 
+			   DateTime datetime,char ETscheme,char *precPath,
+			   char *tmeanPath, char *tmaxPath,char *tminPath,
+			   char *windPath,char *rsdsPath,char *vpPath,
+			   char *forcingName,char *rcpName,char *biasName,			   
+			   float *prec_in, float *temp_in, float *tmax_in, 
+			   float *tmin_in, float *wind_in, float *srad_in, 
+			   float *vp_in,float *hurs_in);
+void HandleError(int);
 void TraverseCorrectionSubCatchment(SubCatchment * const thisSubCatchment, int numberCorrectionCatchments,
                                    int * correctionCatchments, double * correctionPrecipitation, 
                                    double * correctionTemperature, ofstream &fout);
@@ -65,15 +101,30 @@ int main(int argc, char *argv[])
   bool readModelStates=false;
   bool writeModelStates=false;
   char fileName[100];
+  char metPathFileName[100];
+  char metPath2FileName[100];
+  char metPath3FileName[100];
   char fileNameInput[100];
   char fileObsStreamflow[100];
   char buffer[256];
   char modelRun = 'R';
   char modelStates = 'S';
   char inputFormat = 'F';
-  char evaporationModellingControl = 'T';
+  char inputFileFormat = 'N'; //see control file
+  char evaporationModellingControl = 'T'; //T: temperature index, P: penman monteith, see control file
+  char forcingType = 'S'; //S: senorge obs based, C: climate projections, see control file
+  char forcingName [50];
+  char rcpName [50];  
+  char biasName [50];
   char ch;
-  char *metPath;
+  char precPath[200];
+  char tmeanPath[200];
+  char tmaxPath[200];
+  char tminPath[200];
+  char windPath[200];
+  char rsdsPath[200];
+  char vpPath[200];
+  char hursPath[200];
   int i, j, k;
   int numLand;
   int geoIndex;
@@ -90,6 +141,7 @@ int main(int argc, char *argv[])
   int numberCorrectionCatchments;
   int numberIndexStore;
   int seriesNumber;
+  int ndays,oldyear;
   double seriesWeight;
   double sumWeight;
   double sumArea;
@@ -99,6 +151,7 @@ int main(int argc, char *argv[])
   double elementArea, elementLatitude, elementElevation, elementTimefalling, elementSlopeAngle, elementAspect, lakePercent, glacierPercent;
   double areaFraction[maximumNumberLandClasses];
   DateTime datetime;
+  DateTime datetime_nc;
   Lake *ptrLake;
   Glacier *ptrGlacier;
   HbvAquifer *ptrHbvAquifer;
@@ -111,6 +164,8 @@ int main(int argc, char *argv[])
   HBV *ptrHbv;
   LANDSURFACE landSurfType[numberLandSurfaceClasses];
   SOIL soilType[numberSoilClasses];
+  float *prec_in,*temp_in,*tmax_in,*tmin_in,*srad_in,*vp_in,*hurs_in,*wind_in;
+  //FORCESTRUCT Forcings[6];
 
   DateTime nowDate;
   nowDate.now();
@@ -130,11 +185,6 @@ int main(int argc, char *argv[])
     exit (1);
   }
 
-  /*  while (modelRun != 'S' && modelRun != 'C' && modelRun != 's' && modelRun != 'c') {
-      cout << " Type of model run, simulation(S) or calibration(C): ";
-      cin >> modelRun;
-      cout << endl;
-      }*/   
   fileControl.ignore(100,':');
   fileControl >> modelRun;
   fileControl.ignore(256,'\n');
@@ -144,31 +194,6 @@ int main(int argc, char *argv[])
   }
   if (modelRun == 'C' || modelRun == 'c') modelCalibration = true;
 
-  /*  while (modelStates != 'R' && modelStates != 'S' && modelStates != 'r' && modelStates != 's') {
-      cout << " Model states, not in use(N), read(R), write(W) or both read and write(B): ";
-      cin >> modelStates;
-      cout << endl;
-      }*/   
-  /*  fileControl.ignore(100,':');
-  fileControl >> modelStates;
-  fileControl.ignore(256,'\n');
-  if (modelStates != 'N' && modelStates != 'R' && modelStates != 'W' && modelStates != 'B' &&
-      modelStates != 'n' && modelStates != 'r' && modelStates != 'w' && modelStates != 'b') {
-    cout << "\n Model states, not in use(N), read(R), write(W) or both read and write(B) \n\n";
-    exit (1);
-  }
-  if (modelStates == 'R' || modelStates == 'r' || modelStates == 'B' || modelStates == 'b') {
-    readModelStates = true;
-  }
-  if (modelStates == 'W' || modelStates == 'w' || modelStates == 'B' || modelStates == 'b') { 
-    writeModelStates = true;
-    }*/
-
-  /*  while (inputFormat != 'G' && inputFormat != 'T' && inputFormat != 'g' && inputFormat != 't') {
-      cout << " Input data format, grid files(G) or time series file(T): ";
-      cin >> inputFormat;
-      cout << endl;
-      }*/   
   fileControl.ignore(100,':');
   fileControl >> inputFormat;
   fileControl.ignore(256,'\n');
@@ -177,33 +202,40 @@ int main(int argc, char *argv[])
     exit (1);
   }
 
-  /*  while (evaporationModellingControl != 'T' && evaporationModellingControl != 'M' && evaporationModellingControl != 't' && evaporationModellingControl != 't') {
-      cout << " Potential evaporation, temperature index (T) or long-term mean monthly values (M): ";
-      cin >> evaporationModellingControl;
-      cout << endl;
-      }*/
-  /*  fileControl.ignore(256,':');
-  fileControl >> evaporationModellingControl;
-  fileControl.ignore(1024,'\n');
-  if (evaporationModellingControl != 'T' && evaporationModellingControl != 'M' && evaporationModellingControl != 't' && evaporationModellingControl != 'm') {
-    cout << "\n Potential evaporation, temperature index (T) or long-term mean monthly values (M) \n\n";
-    exit (1);
-    }*/
-  // Object for storing evaporation modelling information
-  EvaporationControl * EvaporationControlObject = new EvaporationControl;
-  EvaporationControlObject->SetEvaporationModellingControl(evaporationModellingControl);
+  fileControl.ignore(100,':');
+  fileControl >> inputFileFormat;
+  fileControl.ignore(256,'\n');
+  fprintf(stderr,"fileformat %c\n",inputFileFormat);
 
-  /*  cout << " Output file: ";
-      cin >> fileName;
-      cout << endl;*/
+  if (inputFileFormat != 'N' && inputFileFormat != 'B' && inputFileFormat != 'n' && inputFileFormat != 'b') {
+    cout << "\n Input file format, binary grid files(B) or netcdf(N) \n\n";
+    exit (1);
+  }
+
+  fileControl.ignore(100,':');
+  fileControl >> evaporationModellingControl;
+  fileControl.ignore(256,'\n');
+  fprintf(stderr,"Evapotranspiration scheme: %c\n",evaporationModellingControl);
+
+  if (evaporationModellingControl != 'T' && evaporationModellingControl != 'P') {
+    cout << "\n Evapotranspiration scheme, temperature index (T) or Penman Monteith (P) \n\n";
+    exit (1);
+  }
+
+  // Object for storing evaporation modelling scheme information. 
+  EvaporationControl * EvaporationControlObject = new EvaporationControl;
+  EvaporationControlObject->SetEvaporationModellingControl(evaporationModellingControl); 
+
   fileControl.ignore(100,':');
   fileControl >> fileName;
   fileControl.ignore(256,'\n');
   ofstream fout(fileName);  // Open for writing
-  
+  fprintf(stderr,"output file %s\n",fileName);
+ 
   fileControl.ignore(100, ':');
   fileControl >> writePET;
   fileControl.ignore(256, '\n');
+  fprintf(stderr,"writePET %d\n\n",writePET);
 
   // Read dates for start model, start simulation, end simulation
   /*  cout << " Start model date and time (day, month, year, hour, minute): ";
@@ -216,9 +248,10 @@ int main(int argc, char *argv[])
     cout << endl << " Not legal date and time " << endl << endl;
     exit(1);
   }
-  /*  cout << endl;
-      cout << " Start simulation date and time (day, month, year, hour, minute): ";
-      cin >> day >> mth >> year >> hour >> minute;*/
+  
+  //cout << " Start simulation date and time (day, month, year, hour, minute): ";
+  //cin >> day >> mth >> year >> hour >> minute;
+      
   fileControl.ignore(100,':');
   fileControl >> day >> mth >> year >> hour >> minute;
   fileControl.ignore(256,'\n');
@@ -244,6 +277,75 @@ int main(int argc, char *argv[])
     exit(1);
   }
 
+  cout << startSimulationTime << endl << endSimulationTime << endl;
+
+  fileControl.ignore(100, ':');
+  fileControl >> forcingType;
+  fileControl.ignore(256, '\n');
+  fprintf(stderr,"forcingtype %c\n\n",forcingType);
+  if (forcingType != 'S' && forcingType != 'C') {
+    cout << "\n Input forcing file type, senorge(S) or climateprojections(C) \n\n";
+    exit (1);
+  }
+
+  // Read information on paths to input forcings
+  // (meteorological data, 7 paths, in order to accomodate seNorge, klinogrid, HySN5 and climateprojections)
+  // if evaporation scheme = T: will read only P and T forcing files
+  fileControl.ignore(100,':');
+  fileControl >> fileName;
+  fileControl.ignore(256,'\n');
+  strcpy(precPath,fileName);
+  printf(" precpath (prec) %s\n",fileName);
+  fileControl.ignore(100,':');
+  fileControl >> fileName;
+  fileControl.ignore(256,'\n');
+  strcpy(tmeanPath,fileName);
+  printf(" tmeanpath (tmean) %s\n",fileName);
+  fileControl.ignore(100,':');
+  fileControl >> fileName;
+  fileControl.ignore(256,'\n');
+  strcpy(tmaxPath,fileName);
+  printf(" tmaxpath (tmax) %s\n",fileName);
+  fileControl.ignore(100,':');
+  fileControl >> fileName;
+  fileControl.ignore(256,'\n');
+  strcpy(tminPath,fileName);
+  printf(" tminpath (tmin) %s\n",fileName);  
+  fileControl.ignore(100,':');
+  fileControl >> fileName;
+  fileControl.ignore(256,'\n');
+  strcpy(windPath,fileName);
+  printf(" windpath (wind) %s\n",fileName);
+  fileControl.ignore(100,':');
+  fileControl >> fileName;
+  fileControl.ignore(256,'\n');
+  strcpy(rsdsPath,fileName);
+  printf(" rsdspath (rsds) %s\n",fileName);
+  fileControl.ignore(100,':');
+  fileControl >> fileName;
+  fileControl.ignore(256,'\n');
+  strcpy(hursPath,fileName);
+  printf(" hurspath (hurs) %s\n",fileName);
+
+  // Read information on forcing name (used only when reading climate projections)
+  fileControl.ignore(100,':');
+  fileControl >> fileName;
+  fileControl.ignore(256,'\n');
+  strcpy(forcingName,fileName);
+  printf(" \n forcingname: %s\n",fileName);
+  // Read information on rcp name (used only when reading climate projections)
+  fileControl.ignore(100,':');
+  fileControl >> fileName;
+  fileControl.ignore(256,'\n');
+  strcpy(rcpName,fileName);
+  printf(" rcpname: %s\n",fileName);
+  // Read information on bias name (used only when reading climate projections)
+  fileControl.ignore(100,':');
+  fileControl >> fileName;
+  fileControl.ignore(256,'\n');
+  strcpy(biasName,fileName);
+  printf(" biasname: %s\n",fileName);
+
   // Object for storing meteorological station information
   MeteorologicalStations * MetStations = new MeteorologicalStations;
   MetStations->SetMeteorologicalStations(fileControl, fout);
@@ -255,6 +357,7 @@ int main(int argc, char *argv[])
     cout << endl << " Temporal resolution must be a multiple of " << minimumTimeStep << " seconds : " << ParGeneralStore->GetSECONDS_TIMESTEP() << endl << endl;
     exit(1);
   }
+  cout << endl << " Common parameters file read " << endl;
   // End read common parameters
 
   // Read landsurface parameters file and set parameter values
@@ -277,8 +380,6 @@ int main(int argc, char *argv[])
   // Calculate no. of initial and simulation time steps
   initialTimeSteps = (startSimulationTime.date2jday() - startModelTime.date2jday()) * (int)(numberSecondsDay/ParGeneralStore->GetSECONDS_TIMESTEP());
   numberTimeSteps = (1 + endSimulationTime.date2jday() - startSimulationTime.date2jday()) * (int)(numberSecondsDay/ParGeneralStore->GetSECONDS_TIMESTEP());
-  //  initialTimeSteps = (int)((startSimulationTime-startModelTime)/(double)ParGeneralStore->GetSECONDS_TIMESTEP());
-  //  numberTimeSteps = 1+(int)((endSimulationTime-startSimulationTime)/(double)ParGeneralStore->GetSECONDS_TIMESTEP());
 
   // Read landscape element file and generate landscape element objects  
   /*  cout << " File with landscape element information: ";
@@ -291,7 +392,10 @@ int main(int argc, char *argv[])
   if (!finLandScape.is_open()) {
     cout << endl << " Error opening file " << fileName << endl << endl;
     exit(1);
-  } 
+  }
+  else  {
+    cout << endl << " File with landscape element information opened: " << fileName << endl;
+  }
   finLandScape >> buffer >> nCols;
   finLandScape >> buffer >> nRows;
   finLandScape >> buffer >> xllCorner;
@@ -306,37 +410,23 @@ int main(int argc, char *argv[])
     exit(1);
   } 
   for (i=0; i<numLand; i++) {
-    /*    finLandScape >> landIndex >> geoIndex >> elementArea >> elementElevation >> lakePercent >> glacierPercent;
-    elementSlopeAngle = 0.0;
-    elementAspect = 0.0;*/
     finLandScape >> landIndex >> geoIndex >> elementArea >> elementLatitude >> elementElevation >> elementTimefalling;
     finLandScape >> elementSlopeAngle >> elementAspect >> lakePercent >> glacierPercent;
-    //  cout << landIndex << "  " << geoIndex << "  " << elementArea << "  " << elementElevation << "  " << elementTimefalling << "  ";
-    //  cout << elementSlopeAngle << "  " << elementAspect << "  " << lakePercent << "  " << glacierPercent << "  ";
     sumArea = lakePercent + glacierPercent;
     for (j=0; j<maximumNumberLandClasses; j++) {
       finLandScape >> landSurf >> soil >> areaFraction[j]; 
-      //      finLandScape >> landSurf >> areaFraction[j]; 
       landSurfType[j]=LANDSURFACE(landSurf);
-      //      soil = landSurf;
       soilType[j]=SOIL(soil);
       sumArea = sumArea + areaFraction[j];
     }
-    //    for (j=0; j<maximumNumberLandClasses; j++) {
-    //      cout << landSurfType[j] << "  " << soilType[j] << "  " << areaFraction[j] << "  "; 
-    //    }
-    //    cout << endl;
+
     if (sumArea != 100.0) {
       lakePercent = lakePercent*100.0/sumArea;
       glacierPercent = glacierPercent*100.0/sumArea;
       for (j=0; j<maximumNumberLandClasses; j++) 
         areaFraction[j] = areaFraction[j]*100.0/sumArea;
     }
-    //    cout << lakePercent << "  " << glacierPercent << "  ";
-    //    for (j=0; j<maximumNumberLandClasses; j++) {
-    //      cout << areaFraction[j] << "  "; 
-    //    }
-    //    cout << endl;
+
     DistHbv[landIndex].SetEvaporationControlObj(EvaporationControlObject);
     DistHbv[landIndex].SetGeoIndex(geoIndex);
     DistHbv[landIndex].SetLandIndex(landIndex);
@@ -348,6 +438,7 @@ int main(int argc, char *argv[])
     DistHbv[landIndex].SetAspect(elementAspect);
     DistHbv[landIndex].SetSelectedTimeSeriesElements(SelectedTimeSeriesElementsStore);
     DistHbv[landIndex].SetGeneralPar(ParGeneralStore);
+
     // Allocate space for water balance time series for landscape elements 
     for (j=0; j<DistHbv[landIndex].GetSelectedTimeSeriesElements()->GetNumberElements(); j++) {
       if (DistHbv[landIndex].GetLandIndex() == DistHbv[landIndex].GetSelectedTimeSeriesElements()->GetTimeSeriesElement(j)) {
@@ -394,15 +485,6 @@ int main(int argc, char *argv[])
         }
       }
       DistHbv[landIndex].SetTempStationsWeightedElevation(tempStationsWeightedElevation);
-      //      cout << " tempStationsWeightedElevation = " << tempStationsWeightedElevation << endl;
-        
-      /*      for (j=0; j<ParGeneralStore->GetNUM_PREC_SERIES(); j++) {
-              cout << "P " << DistHbv[landIndex].GetMetSeriesNumber(j) << "  " << DistHbv[landIndex].GetMetSeriesWeight(j) << endl;
-              }
-              for (j=0; j<ParGeneralStore->GetNUM_TEMP_SERIES(); j++) {
-              cout << "T " << DistHbv[landIndex].GetMetSeriesNumber(ParGeneralStore->GetNUM_PREC_SERIES()+j) << 
-              "  " << DistHbv[landIndex].GetMetSeriesWeight(ParGeneralStore->GetNUM_PREC_SERIES()+j) << endl;
-              }*/
     }
     else {    
       finLandScape.ignore(256,'\n');
@@ -553,6 +635,7 @@ int main(int argc, char *argv[])
     cout << endl << " Error opening file " << fileName << endl << endl;
     exit (1);
   }
+  cout << endl << " Sub catchment file opened " << fileName << endl << endl; 
   // Sub-catchment elements
   fileWCo.ignore(100,':');
   fileWCo >> numWatc;
@@ -666,9 +749,7 @@ int main(int argc, char *argv[])
 	  printf("\n File %s not found!\n\n", fileName);
 	  exit(1);
   } 
-
   fgets(buffer, 256, finGridNumbers);
-  //  printf("\n buffer = %s",buffer);
   i = 0;
   while (fgets(buffer, 256, finGridNumbers)) {
 	  i++;
@@ -679,7 +760,6 @@ int main(int argc, char *argv[])
   int * indexStore = new int[numberIndexStore];
   rewind(finGridNumbers);
   fgets(buffer, 256, finGridNumbers);
-  //  printf("\n buffer = %s\n",buffer);
   i = 0;
   while (fgets(buffer, 256, finGridNumbers)) {
 	  sscanf(buffer, "%c %d", &ch, &indexStore[i]);
@@ -690,26 +770,26 @@ int main(int argc, char *argv[])
 	  exit(1);
   }
   fclose(finGridNumbers);
-
+  
   // Read model state variables
   if (readModelStates) { 
     ReadModelStateVariables(DistHbv, numLand);
   }
 
-  // Time series format input data
+  // Time series format input data (e.g. from met stations) 
   if (inputFormat == 'T' || inputFormat == 't') {
     // Object for storing input data for time series
     InputTimeSeries * InputTimeSeriesStore = new
       InputTimeSeries(initialTimeSteps+numberTimeSteps, MetStations->GetNumPrecStations()+MetStations->GetNumTempStations(),
                       startModelTime, endSimulationTime, ParGeneralStore->GetSECONDS_TIMESTEP());
     InputTimeSeriesStore->SetGeneralPar(ParGeneralStore);
-    /*    cout << " File with meteorological input data: ";
-          cin >> fileName;
-          cout << endl;*/
+    //cout << " File with meteorological input data: ";
+    //cin >> fileName;
+    //cout << endl;
     fileControl.ignore(100,':');
     fileControl >> fileNameInput;
     fileControl.ignore(256,'\n');
-    //    cout << fileNameInput << endl;
+    cout << fileNameInput << endl;
     ifstream finInput(fileNameInput);  // Open for reading
     if (!finInput.is_open()) {
       cout << endl << " Error opening file " << fileNameInput << endl << endl;
@@ -742,8 +822,8 @@ int main(int argc, char *argv[])
       }
       // Write state variables for all landscape elements 
       //      if (timeStep == (int)(initialTimeSteps+numberTimeSteps/2) || timeStep == initialTimeSteps+numberTimeSteps-1) {
-	//WriteBinaryGrid(DistHbv, datetime, numLand, timeStep, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout, writePET);
-	//WriteAsciiGrid(DistHbv, datetime, numLand, timeStep, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout);
+      WriteBinaryGrid(DistHbv, datetime, numLand, timeStep, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout, writePET);
+      //	WriteAsciiGrid(DistHbv, datetime, numLand, timeStep, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout);
       //      }
       SnowGlacierIceReDistribution(Outlet, DistHbv, ParGeneralStore, initialTimeSteps, numberTimeSteps, numLand, numWatcOut, timeStep, datetime, 
 				   nRows, nCols, noData, xllCorner, yllCorner, cellSize, modelCalibration, fout); 
@@ -761,49 +841,90 @@ int main(int argc, char *argv[])
     delete InputTimeSeriesStore;
   }
 
-  // Grid file format input data
+  // Grid file format input data (e.g. senorge data)
   else { 
-    // Path to grid files with meteorological input data
-    metPath = getenv("METDATA");
-    if (!metPath) {
-      cout <<" Environment variable METDATA not defined " << endl << endl;
-      exit(1);
-    }
-    unsigned short int * precip10 = new unsigned short int [nRows*nCols];
-    unsigned short int * temp10K = new unsigned short int [nRows*nCols];
-    unsigned short int * tmax10K = new unsigned short int[nRows*nCols];
-    unsigned short int * tmin10K = new unsigned short int[nRows*nCols];
-    unsigned short int * wind10 = new unsigned short int[nRows*nCols];
-    unsigned short int * solar10 = new unsigned short int[nRows*nCols];
-    unsigned short int * vp10 = new unsigned short int[nRows*nCols];
-
+    // allocate memory for input daily bil files (should only be necessary  if inputFileFormat == 'B' || inputFileFormat == 'b'  ) 
+      unsigned short int * precip10 = new unsigned short int [nRows*nCols];
+      unsigned short int * temp10K = new unsigned short int [nRows*nCols];
+      unsigned short int * tmax10K = new unsigned short int[nRows*nCols];
+      unsigned short int * tmin10K = new unsigned short int[nRows*nCols];
+      unsigned short int * wind10 = new unsigned short int[nRows*nCols];
+      unsigned short int * solar10 = new unsigned short int[nRows*nCols];
+      unsigned short int * vp10 = new unsigned short int[nRows*nCols];
+      unsigned short int * hurs = new unsigned short int[nRows*nCols];
+      
+      // allocate memory for input annual .nc files  (should only be necessary  if inputFileFormat == 'N' || inputFileFormat == 'n' ) 
+      prec_in = (float*)calloc(366*nRows*nCols,sizeof(float));
+      temp_in = (float*)calloc(366*nRows*nCols,sizeof(float));
+      tmax_in = (float*)calloc(366*nRows*nCols,sizeof(float));
+      tmin_in = (float*)calloc(366*nRows*nCols,sizeof(float));
+      srad_in = (float*)calloc(366*nRows*nCols,sizeof(float));
+      vp_in = (float*)calloc(366*nRows*nCols,sizeof(float));
+      hurs_in = (float*)calloc(366*nRows*nCols,sizeof(float));
+      wind_in = (float*)calloc(366*nRows*nCols,sizeof(float));
+    
     // Water balance for all elements and time steps for for spin-up period and simulation period
     timeStep=0;
+    oldyear=datetime.getYear();
     for (datetime=startModelTime; datetime<=endSimulationTime; datetime+=ParGeneralStore->GetSECONDS_TIMESTEP()) {
-      //      cout << " timeStep  " << timeStep << endl;
-      //      cout << "  " << datetime.getYear() << "  " << datetime.getMonth() << "  " << datetime.getDay() << "  " 
-      //	   << datetime.getHour() << "  " << datetime.getMinute() << "  " << datetime.getSecond() << endl;
       inputDataFound=true;
-      WaterBalanceGrid(DistHbv, ParGeneralStore, InputElementStore, initialTimeSteps, numberTimeSteps, 
-                       numLand, timeStep, nRows, nCols, 
-                       datetime, metPath, precip10, temp10K, tmax10K, tmin10K, wind10, solar10, vp10, 
-		       &inputDataFound, indexStore, numberIndexStore, fout);
+
+      if (inputFileFormat == 'N' || inputFileFormat == 'n') {
+	if(datetime==startModelTime ||  datetime.getYear()>oldyear) {
+	  //readnetcdf, returner forcings for inneværende år (KSS netcdf filer har data for et år pr fil).
+	  if (forcingType == 'S')  //i.e. historiske, senorge .nc filer
+	    ReadNetcdf(initialTimeSteps, numberTimeSteps, 
+		       numLand,timeStep,nRows,nCols,datetime,evaporationModellingControl,
+		       precPath,tmeanPath,tmaxPath,tminPath,windPath,rsdsPath,
+		       prec_in,temp_in,tmax_in,tmin_in,wind_in,srad_in,vp_in,hurs_in);
+           
+           // cout << "  " << datetime.getYear() << "  " << datetime.getMonth() << "  " << datetime.getDay() << "  " 
+           //    << datetime.getHour() << "  " << datetime.getMinute() << "  " << datetime.getSecond() << endl;  
+	  if (forcingType == 'C')   //i.e. klimadata, KSS-style .nc filer
+	    ReadNetcdfClimateProj(initialTimeSteps, numberTimeSteps, 
+				  numLand, timeStep, nRows, nCols, datetime,evaporationModellingControl,
+				  precPath,tmeanPath,tmaxPath,tminPath,windPath,rsdsPath,hursPath,
+				  forcingName,rcpName,biasName,
+				  prec_in,temp_in,tmax_in,tmin_in,wind_in,srad_in,vp_in,hurs_in);
+	  WaterBalanceGridNetcdf(DistHbv, ParGeneralStore,InputElementStore,initialTimeSteps,numberTimeSteps, 
+				 numLand,timeStep,nRows,nCols,datetime,
+				 prec_in,temp_in,tmax_in,tmin_in,wind_in,srad_in,vp_in, 
+				 &inputDataFound,indexStore,numberIndexStore,fout);
+	  oldyear=datetime.getYear();	  
+	}
+	else { //forcings for this time step already read, go straight to waterbalancegridnetcdf()
+	  WaterBalanceGridNetcdf(DistHbv, ParGeneralStore, InputElementStore, initialTimeSteps, numberTimeSteps, 
+				 numLand, timeStep, nRows, nCols, datetime,
+				 prec_in, temp_in, tmax_in, tmin_in, wind_in, srad_in, vp_in, 
+				 &inputDataFound, indexStore, numberIndexStore, fout);
+
+	}
+      }
+      else   //met input = bil files 
+	WaterBalanceGrid(DistHbv, ParGeneralStore, InputElementStore, initialTimeSteps, numberTimeSteps, 
+			 numLand, timeStep, nRows, nCols, 
+			 datetime, precPath, precip10, temp10K, tmax10K, tmin10K, wind10, solar10, vp10, 
+			 &inputDataFound, indexStore, numberIndexStore, fout);
+        
+       
       // Traverse sub-catchments and landscape elements
       if (inputDataFound) {
-        for (i=0; i<numWatcOut; i++) { 
-          TraverseSubCatchment(Outlet[i], timeStep, fout);
-        }
+	for (i=0; i<numWatcOut; i++) { 
+	  TraverseSubCatchment(Outlet[i], timeStep, fout);
+	}
       }
       else {
-        for (i=0; i<numWatcOut; i++) { 
-          TraverseMissingDataSubCatchment(Outlet[i], timeStep, fout);
-        }
+	for (i=0; i<numWatcOut; i++) { 
+	  TraverseMissingDataSubCatchment(Outlet[i], timeStep, fout);
+	}
       }
-      // Write state variables for all landscape elements 
-      //      if (timeStep == (int)(initialTimeSteps+numberTimeSteps/2.0) || timeStep == initialTimeSteps+numberTimeSteps-1) {
-      //      WriteBinaryGrid(DistHbv, datetime, numLand, timeStep, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout, writePET);
-      //        WriteAsciiGrid(DistHbv, datetime, numLand, timeStep, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout);
-      //      }
+      // Write state variables for all landscape elements
+      //if (timeStep == (int)(initialTimeSteps+numberTimeSteps/2) || timeStep == initialTimeSteps+numberTimeSteps-1) {
+      if (timeStep >= initialTimeSteps) {
+	//printf("%d %d\n",timeStep,initialTimeSteps);
+	WriteBinaryGrid(DistHbv,datetime,numLand,timeStep,nRows,nCols,noData,xllCorner,yllCorner,cellSize,fout,writePET);
+	//WriteAsciiGrid(DistHbv, datetime, numLand, timeStep, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout);
+      }
       SnowGlacierIceReDistribution(Outlet, DistHbv, ParGeneralStore, initialTimeSteps, numberTimeSteps, numLand, numWatcOut, timeStep, datetime, 
 				   nRows, nCols, noData, xllCorner, yllCorner, cellSize, modelCalibration, fout); 
       timeStep++;
@@ -814,74 +935,43 @@ int main(int argc, char *argv[])
     }
     // Write discharge from all sub-catchment elements in sub-catchment hierarchy to output files
     WriteSubCatchmentDischarge(CatchmentElement, numWatc, startSimulationTime, endSimulationTime, initialTimeSteps, 
-                               numberTimeSteps, ParGeneralStore->GetSECONDS_TIMESTEP(), modelCalibration, fout);
+			       numberTimeSteps, ParGeneralStore->GetSECONDS_TIMESTEP(), modelCalibration, fout);
     WriteSubCatchmentWaterBalance(CatchmentElement, numWatc, startSimulationTime, endSimulationTime, 
-                                  initialTimeSteps, numberTimeSteps, ParGeneralStore->GetSECONDS_TIMESTEP());
-    delete [] precip10;
-    delete [] temp10K;
-    delete [] tmax10K;
-    delete [] tmin10K;
-    delete [] wind10;
-    delete [] solar10;
-    delete [] vp10;
-  }
+				  initialTimeSteps, numberTimeSteps, ParGeneralStore->GetSECONDS_TIMESTEP());
 
+    //if (inputFileFormat == 'B' || inputFileFormat == 'b') {
+      delete [] precip10;
+      delete [] temp10K;
+      delete [] tmax10K;
+      delete [] tmin10K;
+      delete [] wind10;
+      delete [] solar10;
+      delete [] vp10;
+      //}
+      //if (inputFileFormat == 'N' || inputFileFormat == 'n') {
+      free(prec_in);
+      free(temp_in);
+      free(tmax_in);
+      free(tmin_in);
+      free(srad_in);
+      free(vp_in);
+      free(wind_in);
+      free(hurs_in);
+  }
+  
   // Write model state variables
   if (writeModelStates) { 
     WriteModelStateVariables(DistHbv, numLand, datetime, timeStep-1, ParGeneralStore->GetSECONDS_TIMESTEP());
   }
 
   // Write water balance grid
-  //  WriteAsciiGridWaterBalance(DistHbv, startSimulationTime, endSimulationTime, numLand, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout);
+   WriteAsciiGridWaterBalance(DistHbv, startSimulationTime, endSimulationTime, numLand, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout);
  
   // Write state variable time series for landscape elements selected for output
   WriteDistributedHbvTimeSeries(DistHbv, numLand, startSimulationTime, endSimulationTime, 
                                 initialTimeSteps, numberTimeSteps, ParGeneralStore->GetSECONDS_TIMESTEP());
 
 
-  /*  k=0;
-      fout << "\nPrecipitation correction grid:\n";
-      for (i=0; i<nRows; i++) {
-      for (j=0; j<nCols; j++) {
-      if (k<numLand) {
-      if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-      fout.width(10); 
-      fout << DistHbv[k].GetPrecipitationCorrection() << "  ";
-      k++;
-      }
-      else {
-      fout.width(10); fout << noData << "  ";
-      }
-      }
-      else {
-      fout.width(10); fout << noData << "  ";
-      }
-      }
-      fout << endl;
-      }
-      fout << endl;
-      k=0;
-      fout << "\nTemperature correction grid:\n";
-      for (i=0; i<nRows; i++) {
-      for (j=0; j<nCols; j++) {
-      if (k<numLand) {
-      if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-      fout.width(10); 
-      fout << DistHbv[k].GetTemperatureCorrection() << "  ";
-      k++;
-      }
-      else {
-      fout.width(10); fout << noData << "  ";
-      }
-      }
-      else {
-      fout.width(10); fout << noData << "  ";
-      }
-      }
-      fout << endl;
-      }*/
-
-  
   fout << endl;
   fout.close();
   fileControl.close();
@@ -959,7 +1049,8 @@ void SnowGlacierIceReDistribution(SubCatchment ** const Outlet, DistributedHbv *
       //        cout << "            Snow " << datetime.getYear() << " " << datetime.getMonth() << " " << datetime.getDay() << " " << endl;
         for (i = 0; i < numLand; i++)
         {
-            DistHbv[i].SetSnowStore(0.0);
+	  //cout << "  ingjerd snow set to zero.... " << ParGeneralStore->GetDAY_SNOW_ZERO() << endl;
+	  DistHbv[i].SetSnowStore(0.0);
         }
     }
 }
@@ -1060,39 +1151,15 @@ void WaterBalanceTimeSeries(DistributedHbv * const DistHbv, ParametersGeneral * 
       else 
         elementPrecipitation = elementPrecipitation*ParGeneralStore->GetPREC_CORR_RAIN()*ParGeneralStore->GetPREC_CORR_SNOW();
     }
-    //    cout << indexPrec << "  "  << indexTemp << "  " << metStationElevation << "  " << weight << "  " << elementTemperature << endl;
-    // Snow store is removed at day no. DAY_SNOW_ZERO
-    /*if (ParGeneralStore->GetDAY_SNOW_ZERO() > 0 &&
-        dayNumber(InputTimeSeriesStore->GetDateTime(timeStep).getYear(),
-                  InputTimeSeriesStore->GetDateTime(timeStep).getMonth(),
-                  InputTimeSeriesStore->GetDateTime(timeStep).getDay()) == 
-		  ParGeneralStore->GetDAY_SNOW_ZERO()+leapYear(InputTimeSeriesStore->GetDateTime(timeStep).getYear())) {*/
-      /*        cout << InputTimeSeriesStore->GetDateTime(timeStep).getYear() << " " 
-             << InputTimeSeriesStore->GetDateTime(timeStep).getMonth() << " "
-             << InputTimeSeriesStore->GetDateTime(timeStep).getDay() << " "
-             << InputTimeSeriesStore->GetDateTime(timeStep).getHour() << " "
-             << InputTimeSeriesStore->GetDateTime(timeStep).getMinute() << " "
-             << "    " << DistHbv[i].GetSnowStore() << endl;*/
-      //        DistHbv[i].SetSnowStore(0.0);
-        //      DistHbv[i].SetSubSurfaceHbvStore(0.2,0.0,0.05);
-    //    }
     if (elementPrecipitation > missingData && elementTemperature > missingData) {
-//      *inputDataFound=true;
       InputElementStore->SetInput(0,elementPrecipitation*DistHbv[i].GetPrecipitationCorrection());
       InputElementStore->SetInput(1,elementTemperature+DistHbv[i].GetTemperatureCorrection());
-      //      cout << elementPrecipitation*1000 << "  " << elementTemperature << endl;
-      /*      if (dayNumber(InputTimeSeriesStore->GetYear(timeStep),InputTimeSeriesStore->GetMth(timeStep),
-              InputTimeSeriesStore->GetDay(timeStep)) == ParGeneralStore->GetDAY_SNOW_ZERO()+
-              leapYear(InputTimeSeriesStore->GetYear(timeStep))) {
-              InputElementStore->SetInput(0,0.0);
-              }*/
+
       dayofyear_PM2 = dayNumber(InputTimeSeriesStore->GetDateTime(timeStep).getYear(),
 				InputTimeSeriesStore->GetDateTime(timeStep).getMonth(),
 				InputTimeSeriesStore->GetDateTime(timeStep).getDay());
       DistHbv[i].WaterBalance(timeStep,datetime,initialTimeSteps,numberTimeSteps,dayofyear_PM2);
-      if (timeStep == initialTimeSteps-1) DistHbv[i].SetInitialStorage();
-      if (timeStep >= initialTimeSteps) DistHbv[i].SetSumWaterBalance();
-      if (timeStep == initialTimeSteps+numberTimeSteps-1) DistHbv[i].SetFinalStorage();
+
     }
     else {
       *inputDataFound=false;
@@ -1100,10 +1167,9 @@ void WaterBalanceTimeSeries(DistributedHbv * const DistHbv, ParametersGeneral * 
   }
 }
 
-
 void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralStore, InputElement * InputElementStore,
                       int initialTimeSteps, int numberTimeSteps, 
-                      int numLand, int timeStep, int nRows, int nCols, DateTime datetime, char * metPath,
+                      int numLand, int timeStep, int nRows, int nCols, DateTime datetime, char * precPath,
                       unsigned short int * precip10, unsigned short int * temp10K, unsigned short int * tmax10K,
 		      unsigned short int * tmin10K, unsigned short int * wind10, unsigned short int * solar10,
 		      unsigned short int * vp10, bool * inputDataFound,
@@ -1123,13 +1189,13 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
   char VPFileName[100];
   char hydYear[5];
 
-  strcpy(precFileName,metPath);
-  strcpy(tempFileName,metPath);
-  strcpy(TmaxFileName, metPath);
-  strcpy(TminFileName, metPath);
-  strcpy(windFileName, metPath);
-  strcpy(solarFileName, metPath);
-  strcpy(VPFileName, metPath);
+  strcpy(precFileName,precPath); //same path for all variables when using .bil input files.
+  strcpy(tempFileName,precPath);
+  strcpy(TmaxFileName,precPath);
+  strcpy(TminFileName,precPath);
+  strcpy(windFileName,precPath);
+  strcpy(solarFileName,precPath);
+  strcpy(VPFileName,precPath);
 
   strcat(precFileName,"/rr/");
   strcat(tempFileName,"/tm/");
@@ -1139,10 +1205,7 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
   strcat(solarFileName, "/srad/");
   strcat(VPFileName, "/vp/");
   
-  //  if (datetime.getMonth() < 9)
-    sprintf(hydYear,"%04d",datetime.getYear());
-    //  else
-    //    sprintf(hydYear,"%04d",datetime.getYear()+1);
+  sprintf(hydYear,"%04d",datetime.getYear());
   strcat(precFileName,hydYear);
   strcat(tempFileName,hydYear);
   strcat(TmaxFileName, hydYear);
@@ -1153,15 +1216,8 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
 
   sprintf(fileName,"/tm_%04d_%02d_%02d.bil",datetime.getYear(),datetime.getMonth(),datetime.getDay());
   strcat(tempFileName,fileName);
-  //  if (datetime.getMonth() != 8) {
-
   sprintf(fileName,"/rr_%04d_%02d_%02d.bil",datetime.getYear(),datetime.getMonth(),datetime.getDay());
-  /*  }
-      else {
-      sprintf(fileName,"/rr_%04d_%02d_%02d.bil",datetime.getYear(),7,datetime.getDay());
-      }*/
   strcat(precFileName,fileName);
-  //  cout << precFileName << "  " << tempFileName << endl;
 
   sprintf(fileName, "/tmax_%04d_%02d_%02d.bil", datetime.getYear(), datetime.getMonth(), datetime.getDay());
   strcat(TmaxFileName, fileName);
@@ -1219,13 +1275,11 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
 	  cout << endl << "Error opening file " << VPFileName << endl << endl;
 	  exit(1);
   }
+  
+  dayofyear_PM2 = dayNumber(datetime.getYear(), datetime.getMonth(), datetime.getDay());
 
-  //  filePrec.read((unsigned short int*) precip10, sizeof(unsigned short int)*nRows*nCols);
-  //  fileTemp.read((unsigned short int*) temp10K, sizeof(unsigned short int)*nRows*nCols);
   streamoff newPosition;
   k=0;
-  //  for (i=0; i<nRows; i++) {
-  //    for (j=0; j<nCols; j++) {
   for (i = 0; i<numberIndexStore; i++) {
      if (k<numLand) {
        //  if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
@@ -1233,6 +1287,11 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
 	    cout << " element not found " << i << " " << indexStore[i] << "    " << k << " " << DistHbv[k].GetGeoIndex() << endl;
 	    k++;
 	}
+	if(dayofyear_PM2==244) {
+	  cout << "ingjerd bil i " << i << " indexStore(i) " << indexStore[i] << endl;
+	  cout << "ingjerd bil k "  << k << " getgeo(k) " << DistHbv[k].GetGeoIndex() << endl;
+	}
+
 	if (DistHbv[k].GetGeoIndex() == indexStore[i]) {
           //newPosition = ELEMENT(i,j)*(sizeof(unsigned short int));
 	  newPosition = i*(sizeof(unsigned short int));
@@ -1284,14 +1343,13 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
 			  vp = (double)vp10[indexStore[i]] / 1000.0/10.0;   // unit: K Pa
 			  //      printf("%d  %f  %f\n",ELEMENT(i,j),precipitation,temperature);
 
-			  /*			  preci_corr = precipitation/((0.82-(0.81*exp((temperature-0.66)/1.07))/(1+exp((temperature-0.66)/1.07)))*exp(-pow((wind/4.24),1.81))
-						  +(0.81*exp((temperature-0.66)/1.07))/(1+exp((temperature-0.66)/1.07))+0.18);*/
+			  //preci_corr = precipitation/((0.82-(0.81*exp((temperature-0.66)/1.07))/(1+exp((temperature-0.66)/1.07)))*exp(-pow((wind/4.24),1.81))
+                          //        +(0.81*exp((temperature-0.66)/1.07))/(1+exp((temperature-0.66)/1.07))+0.18);
 
-			  preci_corr = precipitation;
 			  if(temperature < 0.5) {
-			    preci_corr = ParGeneralStore->GetPREC_CORR_RAIN()*ParGeneralStore->GetPREC_CORR_SNOW()*preci_corr ;
+			    preci_corr = ParGeneralStore->GetPREC_CORR_SNOW()*precipitation ;
 			  } else {
-			    preci_corr = ParGeneralStore->GetPREC_CORR_RAIN()*preci_corr ;
+			    preci_corr = ParGeneralStore->GetPREC_CORR_RAIN()*precipitation ;
 			  }
 
 
@@ -1343,24 +1401,10 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
 		    if (InputElementStore->GetInput(6) == missingData) InputElementStore->SetInput(6, 800.0);
             // }
 		  }
-          // Snow store is removed at day no. DAY_SNOW_ZERO
-          /*if (ParGeneralStore->GetDAY_SNOW_ZERO() > 0 &&
-              dayNumber(datetime.getYear(),datetime.getMonth(),datetime.getDay()) == 
-              ParGeneralStore->GetDAY_SNOW_ZERO()+leapYear(datetime.getYear())) {
-              //      InputElementStore->SetInput(0,0.0);
-              DistHbv[k].SetSnowStore(0.0);
-              //      DistHbv[k].SetSubSurfaceHBVStore(0.2,0.0,0.05);
-          }*/
-		  dayofyear_PM2 = dayNumber(datetime.getYear(), datetime.getMonth(), datetime.getDay());
-
-
-
-	  // Water balance grid values
-	  DistHbv[k].WaterBalance(timeStep,datetime,initialTimeSteps,numberTimeSteps,dayofyear_PM2);
-	  if (timeStep == initialTimeSteps-1) DistHbv[k].SetInitialStorage();
-	  if (timeStep >= initialTimeSteps) DistHbv[k].SetSumWaterBalance();
-	  if (timeStep == initialTimeSteps+numberTimeSteps-1) DistHbv[k].SetFinalStorage();
-	  k++;
+          // Snow store is removed at day no. DAY_SNOW_ZERO //iha removed, was commented out anyway
+		  
+		  DistHbv[k].WaterBalance(timeStep,datetime,initialTimeSteps,numberTimeSteps,dayofyear_PM2);
+		  k++;
         }
       //}
      }
@@ -1374,6 +1418,445 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
   fileVP.close();
 }
 
+void WaterBalanceGridNetcdf(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralStore,
+			    InputElement * InputElementStore,
+			    int initialTimeSteps, int numberTimeSteps, 
+			    int numLand, int timeStep, int nRows, int nCols, DateTime datetime,
+			    float *prec_in, float *temp_in, float *tmax_in, 
+			    float *tmin_in, float *wind_in, float *srad_in, 
+			    float *vp_in, bool * inputDataFound,
+			    int * indexStore, int numberIndexStore, ofstream &fout)
+{
+  int i,j,k,dayofyear,iday,icell;
+  int metMissing = -998;
+  double precipitation, temperature, Tmax, Tmin, wind, solarRadiation, vp;
+  char fileName[100];
+  char hydYear[5];
+
+  iday = dayNumber(datetime.getYear(), datetime.getMonth(), datetime.getDay()-1); //iday to use when finding todays forcings
+  dayofyear=iday;
+  //if(iday==244) 
+  //  printf("ingjerd waterbalancegridnetcdf %d %d %d prec today %.2f %.2f %.2f %.2f %.2f\n",
+  //	   datetime.getYear(),datetime.getMonth(),datetime.getDay(),prec_in[iday*nRows*nCols+72748],temp_in[iday*nRows*nCols+72748],tmax_in[iday*nRows*nCols+72748],tmin_in[iday*nRows*nCols+72748],srad_in[iday*nRows*nCols+72748]);
+ 
+  k=0;
+  for (i = 0; i<numberIndexStore; i++) {
+    if (k<numLand) {
+      while (DistHbv[k].GetGeoIndex()<indexStore[i]) {
+	cout << " 2 element not found i " << i << " indexStore " << indexStore[i] << " k " << k << " getgeo " << DistHbv[k].GetGeoIndex() << endl;
+	k++;
+       }
+       if (DistHbv[k].GetGeoIndex() == indexStore[i]) {
+  	 //cout << " 2 element found i " << i << " indexStore " << indexStore[i] << " k " << k << " getgeo " << DistHbv[k].GetGeoIndex() << endl;
+	 icell=iday*nRows*nCols+indexStore[i];
+	 precipitation = DistHbv[k].GetPrecipitationCorrection()*prec_in[icell]/1000.; // prec from mm to m
+	 temperature = DistHbv[k].GetTemperatureCorrection()+temp_in[icell]; // temperatures in C
+	 Tmax = DistHbv[k].GetTemperatureCorrection()+tmax_in[icell]; 
+	 Tmin = DistHbv[k].GetTemperatureCorrection()+tmin_in[icell];
+	 solarRadiation = srad_in[icell]*ParGeneralStore->GetSECONDS_TIMESTEP()/1e6; // W/m2-> MJ/m2/timestep   
+	 vp = vp_in[icell]/1000.; // input: Pa. HBV: uses kPa.
+	 wind = wind_in[icell]; // m/s
+
+	 //sanity check
+	 if (precipitation < 0 ) precipitation=0.0;
+	 if (temperature < metMissing) temperature=5.0;
+	 if (Tmax < metMissing) {
+	   //cout << " Tmax " << i << " " << indexStore[i] << " tmax  " << Tmax << " iday " << iday << endl;
+	  Tmax=temperature+5;
+	  //cout << " Tmax " << i << " " << indexStore[i] << " tmax  " << Tmax << endl;
+	 }
+	 if (Tmin < metMissing) Tmin=temperature-5;
+	 if (wind < 0 || wind > 50) {
+	   wind=1.;
+	 }
+	 if (solarRadiation < 0) solarRadiation = 2.0; //var 20
+	 if (vp < 0) vp=0.8; // ingjerd: denne var opprinnelig 800, men skal vel være i kPa?
+
+	 *inputDataFound = true;
+	 InputElementStore->SetInput(0, precipitation);
+	 InputElementStore->SetInput(1, temperature);
+	 InputElementStore->SetInput(2, Tmax);
+	 InputElementStore->SetInput(3, Tmin);
+	 InputElementStore->SetInput(4, wind);
+	 InputElementStore->SetInput(5, solarRadiation);
+	 InputElementStore->SetInput(6, vp);
+
+	 DistHbv[k].WaterBalance(timeStep,datetime,initialTimeSteps,numberTimeSteps,dayofyear);
+	 k++;
+       }
+     }
+  }
+}
+
+void ReadNetcdf(int initialTimeSteps, int numberTimeSteps, 
+		int numLand, int timeStep, int nRows, int nCols, DateTime datetime, 
+		char ETscheme,char * precPath,char *tmeanPath,char *tmaxPath,
+		char *tminPath,char *windPath,char *rsdsPath,
+		float *prec_in, float *temp_in, float *tmax_in,
+		float *tmin_in, float *wind_in, float *srad_in,
+		float *vp_in,float *hurs_in)
+{
+  ifstream filePrec, fileTemp, fileTmax, fileTmin, fileSolar, fileWind, fileVP;
+  float dummy;
+  int i,j,k,dayofyear;
+  int ncprecin,nctminin,nctmeanin,nctmaxin;
+  int ncsradin,nclradin,ncvpin,ncwindin,nchursin;
+  int status;
+  int precidin,tempidin,tmaxidin,tminidin,windidin,sradidin,lradidin,vpidin,hursidin;
+  int flag,cellid;
+  int ndays;
+  unsigned short int metMissing = 10000;
+  double precipitation, temperature, Tmax, Tmin, wind, solarRadiation, vp, hurs;
+  char fileName[100];
+  char hydYear[5];
+  char metPathFileName[100];
+  char metPath2FileName[100];
+  char metPath3FileName[100];
+  char precFileName[200];
+  char tmeanFileName[200];
+  char tmaxFileName[200];
+  char tminFileName[200];
+  char sradFileName[200];
+  char vpFileName[200];
+  char windFileName[200];  
+  char hursFileName[200];
+  char VarName[NPARAM][20] = { "rr", "tg", "tx", "tn" }; //senorge variable names (nc files)
+  static size_t start[]={0,0,0};
+  static size_t count[]={366,1550,1195}; //hm. får advarsel når skriver nrows og ncols her. typen stemmer ikke?
+
+  ndays=0;
+  //fprintf(stderr,"%d %d\n",nRows,nCols);
+  sprintf(hydYear,"%04d",datetime.getYear());
+  strcpy(precFileName,precPath);
+  strcat(precFileName,hydYear);
+  strcat(precFileName,".nc");
+
+  sprintf(hydYear,"%04d",datetime.getYear());
+  strcpy(tmeanFileName,tmeanPath);
+  strcat(tmeanFileName,hydYear);
+  strcat(tmeanFileName,".nc");
+
+  sprintf(hydYear,"%04d",datetime.getYear());
+  strcpy(tmaxFileName,tmaxPath);
+  strcat(tmaxFileName,hydYear);
+  strcat(tmaxFileName,".nc");
+
+  sprintf(hydYear,"%04d",datetime.getYear());
+  strcpy(tminFileName,tminPath);
+  strcat(tminFileName,hydYear);
+  strcat(tminFileName,".nc");
+
+  sprintf(hydYear,"%04d",datetime.getYear());
+  strcpy(windFileName,windPath);
+  strcat(windFileName,hydYear);
+  strcat(windFileName,".nc4");
+ 
+  sprintf(hydYear,"%04d",datetime.getYear());
+  strcpy(sradFileName,rsdsPath);
+  strcat(sradFileName,"rsds_daily_");
+  strcat(sradFileName,hydYear);
+  strcat(sradFileName,".nc4");
+
+  sprintf(hydYear,"%04d",datetime.getYear());
+  strcpy(vpFileName,rsdsPath);
+  strcat(vpFileName,"vp_daily_");
+  strcat(vpFileName,hydYear);
+  strcat(vpFileName,".nc4");
+
+  sprintf(hydYear,"%04d",datetime.getYear());
+  strcpy(hursFileName,rsdsPath);
+  strcat(hursFileName,"hurs_daily_");
+  strcat(hursFileName,hydYear);
+  strcat(hursFileName,".nc4");
+
+  dayofyear = dayNumber(datetime.getYear(), datetime.getMonth(), datetime.getDay());
+  ndays=dayNumber(datetime.getYear(),12,31);
+  printf("ingjerd readnetcdf %d %d %d DoY %d, ET scheme: %c\n",
+	 datetime.getYear(),datetime.getMonth(),datetime.getDay(),dayofyear,ETscheme);
+
+  count[0]=ndays;
+
+  /* Open and read metfiles */
+  printf("readnetcdf prec file %s\n",precFileName);
+  status = nc_open(precFileName,NC_NOWRITE,&ncprecin); HandleError(status);
+  status = nc_inq_varid(ncprecin,VarName[0],&precidin); HandleError(status);
+  status = nc_get_vara_float(ncprecin,precidin,start,count,prec_in); HandleError(status);
+  nc_close(ncprecin);
+  
+  printf("readnetcdf tmean file %s\n",tmeanFileName);
+  status = nc_open(tmeanFileName,NC_NOWRITE,&nctmeanin); HandleError(status);
+  status = nc_inq_varid(nctmeanin,VarName[1],&tempidin); HandleError(status);
+  status = nc_get_vara_float(nctmeanin,tempidin,start,count,temp_in); HandleError(status);
+  status = nc_close(nctmeanin);
+  
+
+ 
+  if (ETscheme == 'P') { //etscheme = penman monteith
+    printf("readnetcdf tmax file %s\n",tmaxFileName);
+    status = nc_open(tminFileName,NC_NOWRITE,&nctmaxin); HandleError(status);
+    status = nc_inq_varid(nctmaxin,VarName[2],&tmaxidin); HandleError(status);
+    status = nc_get_vara_float(nctmaxin,tmaxidin,start,count,tmax_in); HandleError(status);
+    status = nc_close(nctmaxin); HandleError(status);
+
+    printf("readnetcdf tmin file %s\n",tminFileName);
+    status = nc_open(tminFileName,NC_NOWRITE,&nctminin); HandleError(status);
+    status = nc_inq_varid(nctminin,VarName[3],&tminidin); HandleError(status);
+    status = nc_get_vara_float(nctminin,tminidin,start,count,tmin_in); HandleError(status);
+    status = nc_close(nctminin); HandleError(status);
+
+    printf("readnetcdf sradfile %s\n",sradFileName);
+    status = nc_open(sradFileName,NC_NOWRITE,&ncsradin); HandleError(status);
+    status = nc_inq_varid(ncsradin,"rsds",&sradidin); HandleError(status);
+    status = nc_get_vara_float(ncsradin,sradidin,start,count,srad_in); HandleError(status);
+    status = nc_close(ncsradin); HandleError(status);
+
+  /*  printf("readnetcdf %s\n",vpFileName);
+    status = nc_open(vpFileName,NC_NOWRITE,&ncvpin); HandleError(status);
+    status = nc_inq_varid(ncvpin,"vp",&vpidin); HandleError(status);
+    status = nc_get_vara_float(ncvpin,vpidin,start,count,vp_in); HandleError(status);
+    status = nc_close(ncvpin); HandleError(status);   */
+
+    printf("readnetcdf windfile %s\n",windFileName);
+    status = nc_open(windFileName,NC_NOWRITE,&ncwindin); HandleError(status);
+    status = nc_inq_varid(ncwindin,"windspeed_10m",&windidin); HandleError(status);
+    status = nc_get_vara_float(ncwindin,windidin,start,count,wind_in); HandleError(status);
+    status = nc_close(ncwindin); HandleError(status);
+
+    printf("readnetcdf hursfile %s\n",hursFileName);
+    status = nc_open(hursFileName,NC_NOWRITE,&nchursin); HandleError(status);
+    status = nc_inq_varid(nchursin,"hurs",&hursidin); HandleError(status);
+    status = nc_get_vara_float(nchursin,hursidin,start,count,hurs_in); HandleError(status);
+    status = nc_close(nchursin); HandleError(status);   
+  }
+
+  if (ETscheme == 'P') {
+    for(k=0;k<ndays*(nRows*nCols);k++) {
+      vp_in[k]=hurs_in[k]*(6.11*exp((17.27*temp_in[k])/(237.3+temp_in[k]))); //hurs=percent,->vp_in=Pa (nb! later divided by 1000!)
+    }
+  }
+  
+   /* flag=0;
+  for(k=0;k<ndays;k++) {
+    cellid=0; //cellid counter
+    for(i=0;i<nRows;i++) {
+      for(j=0;j<nCols;j++) {
+	if(k<=180 && cellid==1573912) {
+	  dummy=hurs_in[flag]*(6.11*exp((17.27*temp_in[flag])/(237.3+temp_in[flag]))); //Pa
+	  printf("ingjerd readnetcdf day %d row %d col %d cellnr %d \t p %.1f t %.2f srad %.1f vp %.1f vp-est %.3f hurs %.1f\n",
+		 k,i,j,i*nCols+j,prec_in[flag],temp_in[flag],srad_in[flag],vp_in[flag],dummy,hurs_in[flag]);
+	}
+	flag+=1;
+	cellid+=1;
+      }
+    }
+    }*/
+    //printf("readnetcdf file ready\n");
+}
+
+void ReadNetcdfClimateProj(int initialTimeSteps, int numberTimeSteps, 
+			   int numLand, int timeStep, int nRows, int nCols, DateTime datetime, 
+			   char ETscheme,char *precPath,char *tmeanPath,char *tmaxPath,
+			   char *tminPath,char *windPath,char *rsdsPath,char *hursPath,
+			   char *forcingName,char *rcpName,char *biasName,
+			   float *prec_in, float *temp_in, float *tmax_in,
+			   float *tmin_in, float *wind_in, float *srad_in,
+			   float *vp_in,float *hurs_in)
+{
+  ifstream filePrec, fileTemp, fileTmax, fileTmin, fileSolar, fileWind, fileHurs;
+  int i,j,k,dayofyear;
+  int ncprecin,nctminin,nctmeanin,nctmaxin;
+  int ncsradin,nclradin,nchursin,ncpressin,ncwindin;
+  int status;
+  int precidin,tempidin,tmaxidin,tminidin,windidin,sradidin,lradidin,hursidin,pressidin;
+  int flag,cellid;
+  int ndays;
+  double precipitation, temperature, Tmax, Tmin, wind,solarRadiation,hurs;
+  char fileName[100];
+  char hydYear[5];
+  char precFileName[200];
+  char tmeanFileName[200];
+  char tmaxFileName[200];
+  char tminFileName[200];
+  char sradFileName[200];
+  char hursFileName[200];
+  char windFileName[200];
+  char projfix[100];
+  int ThisYear;
+  static size_t start[]={0,0,0};
+  static size_t count[]={366,1550,1195}; //hm. får advarsel når skriver nrows og ncols her. typen stemmer ikke?
+
+  ndays=0; 
+  sprintf(hydYear,"%04d",datetime.getYear());
+  ThisYear=(int)datetime.getYear();
+  
+  if(ThisYear<=2014) {
+    strcpy(projfix,"hist/");
+    strcat(projfix,forcingName);
+    strcat(projfix,"_hist_");
+    strcat(projfix,biasName);
+    printf("\nprojfix: %s\n",projfix);
+  }
+  else  {
+    strcpy(projfix,rcpName);
+    strcat(projfix,"/");
+    strcat(projfix,forcingName);
+    strcat(projfix,"_");
+    strcat(projfix,rcpName);
+    strcat(projfix,"_");
+    strcat(projfix,biasName);
+    printf("\nprojfix: %s\n\n",projfix);
+  }
+    
+  strcpy(precFileName,precPath);
+  strcat(precFileName,forcingName);
+  strcat(precFileName,"/pr/");
+  strcat(precFileName,projfix);
+  strcat(precFileName,"-sn2018v2005_rawbc_norway_1km_pr_daily_");
+  strcat(precFileName,hydYear);
+  strcat(precFileName,".nc4");
+  
+  strcpy(tmeanFileName,tmeanPath);
+  strcat(tmeanFileName,forcingName);
+  strcat(tmeanFileName,"/tas/");
+  strcat(tmeanFileName,projfix);
+  strcat(tmeanFileName,"-sn2018v2005_rawbc_norway_1km_tas_daily_");  
+  strcat(tmeanFileName,hydYear);
+  strcat(tmeanFileName,".nc4");
+
+  strcpy(tmaxFileName,tmaxPath);
+  strcat(tmaxFileName,forcingName);
+  strcat(tmaxFileName,"/tasmax/");
+  strcat(tmaxFileName,projfix);
+  strcat(tmaxFileName,"-sn2018v2005_rawbc_norway_1km_tasmax_daily_"); 
+  strcat(tmaxFileName,hydYear);
+  strcat(tmaxFileName,".nc4");
+
+  strcpy(tminFileName,tminPath);
+  strcat(tminFileName,forcingName);
+  strcat(tminFileName,"/tasmin/");
+  strcat(tminFileName,projfix);
+  strcat(tminFileName,"-sn2018v2005_rawbc_norway_1km_tasmin_daily_"); 
+  strcat(tminFileName,hydYear);
+  strcat(tminFileName,".nc4");
+
+  strcpy(windFileName,windPath);
+  strcat(windFileName,forcingName);
+  strcat(windFileName,"/sfcWind/");
+  strcat(windFileName,projfix);
+  strcat(windFileName,"-klinogrid1612_rawbc_norway_1km_sfcWind_daily_"); 
+  strcat(windFileName,hydYear);
+  strcat(windFileName,".nc4");
+ 
+  strcpy(sradFileName,rsdsPath);
+  strcat(sradFileName,forcingName);
+  strcat(sradFileName,"/rsds/");
+  strcat(sradFileName,projfix);
+  strcat(sradFileName,"-hysn2018v2005era5_rawbc_norway_1km_rsds_daily_"); 
+  strcat(sradFileName,hydYear);
+  strcat(sradFileName,".nc4");
+
+  strcpy(hursFileName,hursPath);
+  strcat(hursFileName,forcingName);
+  strcat(hursFileName,"/hurs/");
+  strcat(hursFileName,projfix);
+  strcat(hursFileName,"-hysn2018v2005era5_rawbc_norway_1km_hurs_daily_"); 
+  strcat(hursFileName,hydYear);
+  strcat(hursFileName,".nc4");
+
+  dayofyear = dayNumber(datetime.getYear(), datetime.getMonth(), datetime.getDay());
+  ndays=dayNumber(datetime.getYear(),12,31);
+  printf("ingjerd readnetcdf %d %d %d DoY %d, ET scheme: %c\n",
+	 datetime.getYear(),datetime.getMonth(),datetime.getDay(),dayofyear,ETscheme);
+
+  count[0]=ndays;
+
+  /* Open and read metfiles */
+  printf("readnetcdf prec file %s\n",precFileName);
+  status = nc_open(precFileName,NC_NOWRITE,&ncprecin); HandleError(status);
+  status = nc_inq_varid(ncprecin,"pr",&precidin); HandleError(status);
+  status = nc_get_vara_float(ncprecin,precidin,start,count,prec_in); HandleError(status);
+  nc_close(ncprecin);
+  
+  printf("readnetcdf tmean file %s\n",tmeanFileName);
+  status = nc_open(tmeanFileName,NC_NOWRITE,&nctmeanin); HandleError(status);
+  status = nc_inq_varid(nctmeanin,"tas",&tempidin); HandleError(status);
+  status = nc_get_vara_float(nctmeanin,tempidin,start,count,temp_in); HandleError(status);
+  status = nc_close(nctmeanin); HandleError(status);
+
+  if (ETscheme == 'P') { //etscheme = penman-monteith
+    printf("readnetcdf tmax file %s\n",tmaxFileName);
+    status = nc_open(tmaxFileName,NC_NOWRITE,&nctmaxin); HandleError(status);
+    status = nc_inq_varid(nctmaxin,"tasmax",&tmaxidin); HandleError(status);
+    status = nc_get_vara_float(nctmaxin,tmaxidin,start,count,tmax_in); HandleError(status);
+    status = nc_close(nctmaxin); HandleError(status);
+
+    printf("readnetcdf tmin file %s\n",tminFileName);
+    status = nc_open(tminFileName,NC_NOWRITE,&nctminin); HandleError(status);
+    status = nc_inq_varid(nctminin,"tasmin",&tminidin); HandleError(status);
+    status = nc_get_vara_float(nctminin,tminidin,start,count,tmin_in); HandleError(status);
+    status = nc_close(nctminin); HandleError(status);
+
+    printf("readnetcdf sradfile %s\n",sradFileName);
+    status = nc_open(sradFileName,NC_NOWRITE,&ncsradin); HandleError(status);
+    status = nc_inq_varid(ncsradin,"rsds",&sradidin); HandleError(status);
+    status = nc_get_vara_float(ncsradin,sradidin,start,count,srad_in); HandleError(status);
+    status = nc_close(ncsradin); HandleError(status);
+
+    printf("readnetcdf hursfile %s\n",hursFileName);
+    status = nc_open(hursFileName,NC_NOWRITE,&nchursin); HandleError(status);
+    status = nc_inq_varid(nchursin,"hurs",&hursidin); HandleError(status);
+    status = nc_get_vara_float(nchursin,hursidin,start,count,hurs_in); HandleError(status);
+    status = nc_close(nchursin); HandleError(status);
+
+    printf("readnetcdf windfile %s\n",windFileName);
+    status = nc_open(windFileName,NC_NOWRITE,&ncwindin); HandleError(status);
+    status = nc_inq_varid(ncwindin,"sfcWind",&windidin); HandleError(status);
+    status = nc_get_vara_float(ncwindin,windidin,start,count,wind_in); HandleError(status);
+    status = nc_close(ncwindin); HandleError(status);
+  }
+
+  if (ETscheme == 'T') {
+    for(k=0;k<ndays*(nRows*nCols);k++) {
+      if(prec_in[k]<NODATA) {
+	prec_in[k]*=S_PR_DAY; 	
+        temp_in[k]-=KELVIN;
+      }
+    }
+  }
+  else {
+    for(k=0;k<ndays*(nRows*nCols);k++) {
+      if(prec_in[k]<NODATA) {
+	prec_in[k]*=S_PR_DAY; 	
+ 	temp_in[k]-=KELVIN;
+	tmax_in[k]-=KELVIN;
+	tmin_in[k]-=KELVIN;
+	vp_in[k]=hurs_in[k]*(6.11*exp((17.27*temp_in[k])/(237.3+temp_in[k]))); //hurs=percent,->vp_in=Pa (nb! later divided by 1000!)
+      }
+    }
+  }
+  
+  /*flag=0; 
+  for(k=0;k<ndays;k++) {
+    cellid=0; 
+    for(i=0;i<nRows;i++) {
+      for(j=0;j<nCols;j++) {
+	if(k<=150 && cellid==1573912) 
+	  printf("readnetcdfclimate day %d row %d col %d cellnr %d \t p %.1f t %.2f tmin %.2f tmax %.2f srad %.1f wind %.1f hurs %.1f vp %.1f\n",
+	  	 k,i,j,i*nCols+j,prec_in[flag],temp_in[flag],tmin_in[flag],tmax_in[flag],srad_in[flag],wind_in[flag],hurs_in[flag],vp_in[flag]);
+	flag+=1;
+	cellid+=1;
+      }
+    }
+    }*/
+}
+
+void HandleError(int status) 
+{
+  if (status != NC_NOERR) {
+    fprintf(stderr, "%s\n", nc_strerror(status));
+    exit(-1);
+  }
+}
 
 void TraverseCorrectionSubCatchment(SubCatchment * const thisSubCatchment, int numberCorrectionCatchments,
      int * correctionCatchments, double * correctionPrecipitation, double * correctionTemperature, ofstream &fout)
@@ -2268,349 +2751,229 @@ void WriteBinaryGrid(DistributedHbv * const DistHbv, DateTime datetime, int numL
                      int nCols, int noData, double xllCorner, double yllCorner, double cellSize, ofstream &fout, int writePET)
 {
   int i,j,k;
+  int writeRun,writeEva,writeTem,writePre,writeSwe,writeScf,writeGmb,writeLak;
+  int writeWout,writeSmw,writeHsd,writeHsm,writeHgw,writeHlz,writeHuz;
   char fileName[100];
   char dirName[100];
   char timeName[100];
-  //  unsigned short int noData16=65535;
-  ofstream fileTemp, filePre, fileEva, filePeva, fileSwe, fileScf, fileSmw, fileRun, fileHbv, fileHsd, fileHsm, fileHgw, fileHlz;
-  sprintf(dirName,"./%04d/",datetime.getYear());
-  sprintf(timeName,"_%04d_%02d_%02d.bil",datetime.getYear(),datetime.getMonth(),datetime.getDay());
-   //cout << endl << " date  " << datetime.getYear() << datetime.getMonth() << datetime.getDay() << endl;
-   // cout << endl << " numLand  " << numLand << endl;
-
-    if (writePET > 0) {
-  //  Temperature in landscape elements 
-  // float * temp = new float [numLand];
-  short int * temp = new short int[numLand];
-  strcpy(fileName,dirName);
-  strcat(fileName,"tem");
-  strcat(fileName,timeName);
-  fileTemp.open(fileName,ios::out | ios::binary);
-  if (!fileTemp.is_open()) {
-    cout << endl << "Error opening file " << fileName << endl << endl;
-    exit (1);
-  }
-  k=0;
-  /*  for (i=0; i<nRows; i++) {
-      for (j=0; j<nCols; j++) {*/
-  while (k<numLand) {
-//    if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-//      if (DistHbv[k].GetAccumulatedTemperature() > missingData) 
-      if (DistHbv[k].GetTemperature() > missingData) 
-       // temp[k] = (float) ((DistHbv[k].GetTemperature()));
-		  temp[k] = (short int)((DistHbv[k].GetTemperature()) * 100); //temperature C*100
-      else
-        // temp[k] = (float) noData;
-		  temp[k] = (short int)noData;
-      k++;
-  }
-/*        else {
-          temp[ELEMENT(i,j)] = noData;
-        }
-      }
-      else {
-        temp[ELEMENT(i,j)] = noData;
-      }
-      }
-      }*/
-  // fileTemp.write(reinterpret_cast<char *>(temp), sizeof(float)*numLand);
-     fileTemp.write(reinterpret_cast<char *>(temp), sizeof(short int)*numLand);
-  fileTemp.close();
-  delete [] temp;
-	}
+  ofstream fileTemp,filePre,fileEva,filePeva,fileSwe,fileScf,fileSmw,fileRun,fileHbv,fileHsd,fileHsm,fileHgw,fileHlz,fileHuz,fileLak,fileGmb,fileWou;
   
-    if (writePET > 0) {
-  //  Precipitation in landscape elements 
-  //float * pre = new float [numLand];
-  unsigned short int * pre = new unsigned short int[numLand];
-  strcpy(fileName,dirName);
-  strcat(fileName,"pre");
-  strcat(fileName,timeName);
-  filePre.open(fileName,ios::out | ios::binary);
-  if (!filePre.is_open()) {
-    cout << endl << "Error opening file " << fileName << endl << endl;
-    exit (1);
-  }
-  k=0;
-  /*  for (i=0; i<nRows; i++) {
-      for (j=0; j<nCols; j++) {*/
-  while (k<numLand) {
-//    if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-//      if (DistHbv[k].GetAccumulatedPrecipitation() > missingData) 
-      if (DistHbv[k].GetPrecipitation() > missingData) 
-        //pre[k] = (float) ((DistHbv[k].GetPrecipitation())*1000.0);
-        pre[k] = (unsigned short int)((DistHbv[k].GetPrecipitation()) *1000.0*10.0); 
-      else
-        //pre[k] = (float) noData;
-        pre[k] = (unsigned short int) noData;
-      k++;
-  }
-/*        else {
-          pre[ELEMENT(i,j)] = noData;
-          }
-          }
-          else {
-          pre[ELEMENT(i,j)] = noData;
-          }
-          }
-          }*/
-  //filePre.write(reinterpret_cast<char *>(pre), sizeof(float)*numLand);
-  filePre.write(reinterpret_cast<char *>(pre), sizeof(unsigned short int)*numLand); 
-  filePre.close();
-  delete [] pre;
-	}
-  
-    if (writePET > 0) {
-  //  Evapotranspiration from landscape elements
-  unsigned short int * eva = new unsigned short int [numLand];
-  strcpy(fileName,dirName);
-  strcat(fileName,"eva");
-  strcat(fileName,timeName);
-  fileEva.open(fileName,ios::out | ios::binary);
-  if (!fileEva.is_open()) {
-    cout << endl << "Error opening file " << fileName << endl << endl;
-    exit (1);
-  }
-  k=0;
-  /*  for (i=0; i<nRows; i++) {
-      for (j=0; j<nCols; j++) {*/
-  while (k<numLand) {
-//      if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-    if (DistHbv[k].GetEvapotranspiration() > missingData)
-    //DistHbv[k].GetInterceptionLoss() > missingData &&
-        //DistHbv[k].GetTranspSoilEvap() > missingData &&
-        //DistHbv[k].GetLakeEvap() > missingData)
-      //      eva[k] = (float) ((DistHbv[k].GetInterceptionLoss() + DistHbv[k].GetTranspSoilEvap() + 
-      //                         DistHbv[k].GetLakeEvap())*1000.0);
-      eva[k] = (unsigned short int) ((DistHbv[k].GetEvapotranspiration())*1000.0*100.);
-     // cout << endl << " EP =  " << eva[k] ;
-      
-    else
-       eva[k] = (unsigned short int) noData;
-       // cout << endl << " EP =  " << eva[k] ;
-        
-      
-
-    k++;
-  }
-/*        else {
-          eva[ELEMENT(i,j)] = noData;
-          }
-          }
-          else {
-          eva[ELEMENT(i,j)] = noData;
-          }
-          }
-          }*/
-  fileEva.write(reinterpret_cast<char *>(eva), sizeof(unsigned short int)*numLand);
-  fileEva.close();
-  delete [] eva;
-	}
-
-   // if (writePET < 1) {
-  //  Potential Evapotranspiration from landscape elements
-  unsigned short int   * peva = new unsigned short int [numLand];
-  strcpy(fileName, dirName);
-  strcat(fileName, "peva");
-  strcat(fileName, timeName);
-  filePeva.open(fileName, ios::out | ios::binary);
-  if (!filePeva.is_open()) {
-	  cout << endl << "Error opening file " << fileName << endl << endl;
-	  exit(1);
-  }
-  k = 0;
-  /*  for (i=0; i<nRows; i++) {
-  for (j=0; j<nCols; j++) {*/
-  while (k<numLand) {
-	  //      if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-	  if (DistHbv[k].GetPET() > missingData) 
-		  //&& DistHbv[k].GetLakeEvap() > missingData)
-		  //      eva[k] = (float) ((DistHbv[k].GetInterceptionLoss() + DistHbv[k].GetTranspSoilEvap() + 
-		  //                         DistHbv[k].GetLakeEvap())*1000.0);
-		   peva[k] = (unsigned short int)((DistHbv[k].GetPET())*1000.0*100.);              //mm/day *100 so that I can have two digital precision
-        // if(k==4244)      cout <<  " ETP =  " << peva[k] << endl;
-                
-	  else
-		   peva[k] = (unsigned short int) noData;
-     // cout << endl << " ETP =  " << peva[k] ;
-    
-	  k++;
-
-  }
-
-  /*        else {
-  eva[ELEMENT(i,j)] = noData;
-  }
-  }
-  else {
-  eva[ELEMENT(i,j)] = noData;
-  }
-  }
-  }*/
-  filePeva.write(reinterpret_cast<char *>(peva), sizeof(unsigned short int)*numLand);
-  filePeva.close();
-  delete[] peva;
-	//}
-  
-    if (writePET > 0) {
-  //  Snow store in landscape elements
-  // float * swe = new float [numLand];
-  unsigned short int * swe = new unsigned short int[numLand];
-  strcpy(fileName,dirName);
-  strcat(fileName,"swe");
-  strcat(fileName,timeName);
-  fileSwe.open(fileName,ios::out | ios::binary);
-  if (!fileSwe.is_open()) {
-    cout << endl << "Error opening file " << fileName << endl << endl;
-    exit (1);
-  }
-  k=0;
-  /*  for (i=0; i<nRows; i++) {
-      for (j=0; j<nCols; j++) {*/
-  while (k<numLand) {
-//        if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-      if (DistHbv[k].GetSnowStore() > missingData) 
-          // swe[k] = (float) ((DistHbv[k].GetSnowStore()+DistHbv[k].GetMeltWater())*1000.0);
-		  swe[k] = (unsigned short int) ((DistHbv[k].GetSnowStore() + DistHbv[k].GetMeltWater()) * 1000); //mm (ingjerd: kan ikke ha *10, da kan du gå over unsigned short int grensa på 65535
-      else
-          // swe[k] = (float) noData;
-		  swe[k] = (unsigned short int) noData;
-      k++;
-  }
-/*        else {
-          swe[ELEMENT(i,j)] = noData;
-          }
-          }
-          else {
-          swe[ELEMENT(i,j)] = noData;
-          }
-          }
-          }*/
-  // fileSwe.write(reinterpret_cast<char *>(swe), sizeof(float)*numLand);
-  fileSwe.write(reinterpret_cast<char *>(swe), sizeof(unsigned short int)*numLand);
-  fileSwe.close();
-  delete [] swe;
-	}
-  
-    if (writePET > 0) {
-  //  Snowcover fraction in landscape elements
-  // float * scf = new float [numLand];
-  unsigned short int * scf = new unsigned short int[numLand];
-  strcpy(fileName,dirName);
-  strcat(fileName,"scf");
-  strcat(fileName,timeName);
-  fileScf.open(fileName,ios::out | ios::binary);
-  if (!fileScf.is_open()) {
-    cout << endl << "Error opening file " << fileName << endl << endl;
-    exit (1);
-  }
-  k=0;
-  /*  for (i=0; i<nRows; i++) {
-      for (j=0; j<nCols; j++) {*/
-  while (k<numLand) {
-//        if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-      if (DistHbv[k].GetSnowCoverFraction() > missingData) 
-          // scf[k] = (float) ((DistHbv[k].GetSnowCoverFraction())*100.0);
-	      scf[k] = (unsigned short int) ((DistHbv[k].GetSnowCoverFraction()) * 10000); //prosent*100
-      else
-          // scf[k] = (float) noData;
-		  scf[k] = (unsigned short int) noData;
-      k++;
-  }
-/*        else {
-          scf[ELEMENT(i,j)] = noData;
-          }
-          }
-          else {
-          scf[ELEMENT(i,j)] = noData;
-          }
-          }
-          }*/
-  // fileScf.write(reinterpret_cast<char *>(scf), sizeof(float)*numLand);
-  fileScf.write(reinterpret_cast<char *>(scf), sizeof(unsigned short int)*numLand);
-  fileScf.close();
-  delete [] scf;
-	}
+  writeRun=writeEva=writeSwe=1;
+  writeWout=writeHsd=writeHsm=writeHgw=writeHuz=1;
+  writeTem=writePre=0;
+  writeGmb=writeLak=writeSmw=writeHlz=writeScf=0;
    
-    if (writePET > 0) {
-  //  Snow meltwater in landscape elements
-  // float * smw = new float [numLand];
-  unsigned short int * smw = new unsigned short int[numLand];
-  strcpy(fileName,dirName);
-  strcat(fileName,"smw");
-  strcat(fileName,timeName);
-  fileSmw.open(fileName,ios::out | ios::binary);
-  if (!fileSmw.is_open()) {
-    cout << endl << "Error opening file " << fileName << endl << endl;
-    exit (1);
+  sprintf(dirName,"./hbv_output/");
+  sprintf(timeName,"_%04d_%02d_%02d.bil",datetime.getYear(),datetime.getMonth(),datetime.getDay());
+  //cout << endl << " date  " << datetime.getYear() << datetime.getMonth() << datetime.getDay() << endl;
+  // cout << endl << " numLand  " << numLand << endl;
+
+  if (writeTem == 1) {   //  Temperature in landscape elements 
+    short int * temp = new short int[numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"tem");
+    strcat(fileName,timeName);
+    fileTemp.open(fileName,ios::out | ios::binary);
+    if (!fileTemp.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
+    }
+    k=0;
+    while (k<numLand) {
+      if (DistHbv[k].GetTemperature() > missingData) 
+	temp[k] = (short int)((DistHbv[k].GetTemperature()) * 100); //temperature C*100
+      else
+	temp[k] = (short int)noData;
+      k++;
+    }
+    fileTemp.write(reinterpret_cast<char *>(temp), sizeof(short int)*numLand);
+    fileTemp.close();
+    delete [] temp;
   }
-  k=0;
-  /*  for (i=0; i<nRows; i++) {
-      for (j=0; j<nCols; j++) {*/
-  while (k<numLand) {
-//        if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
+  
+  if (writePre == 1) { //  Precipitation in landscape elements 
+    float * pre = new float [numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"pre");
+    strcat(fileName,timeName);
+    filePre.open(fileName,ios::out | ios::binary);
+    if (!filePre.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
+    }
+    k=0;
+    while (k<numLand) {
+      if (DistHbv[k].GetPrecipitation() > missingData) 
+	pre[k] = (float) ((DistHbv[k].GetPrecipitation())*1000.0);
+      else
+	pre[k] = (float) noData;
+      k++;
+    }
+    filePre.write(reinterpret_cast<char *>(pre), sizeof(float)*numLand);
+    filePre.close();
+    delete [] pre;
+  }
+  
+  if (writeEva == 1) {    //  Evapotranspiration from landscape elements
+    float * eva = new float [numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"eva");
+    strcat(fileName,timeName);
+    fileEva.open(fileName,ios::out | ios::binary);
+    if (!fileEva.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
+    }
+    k=0;
+    while (k<numLand) {
+      if (DistHbv[k].GetEvapotranspiration() > missingData)
+	eva[k] = (float) ((DistHbv[k].GetEvapotranspiration()*1000.));
+      else
+	eva[k] = (float) noData;
+      k++;
+    }
+    fileEva.write(reinterpret_cast<char *>(eva), sizeof(float)*numLand);
+    fileEva.close();
+    delete [] eva;
+  }
+  
+  if (writePET == 1) {  //  Potential Evapotranspiration from landscape elements
+    unsigned short int   * peva = new unsigned short int [numLand];
+    strcpy(fileName, dirName);
+    strcat(fileName, "peva");
+    strcat(fileName, timeName);
+    filePeva.open(fileName, ios::out | ios::binary);
+    if (!filePeva.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit(1);
+    }
+    k = 0;
+    while (k<numLand) {
+      if (DistHbv[k].GetPET() > missingData) 
+	peva[k] = (unsigned short int)((DistHbv[k].GetPET())*1000.0*100.);  //mm/day *100 so that I can have two digital precision
+      else
+	peva[k] = (unsigned short int) noData;
+      k++;
+    }
+    filePeva.write(reinterpret_cast<char *>(peva), sizeof(unsigned short int)*numLand);
+    filePeva.close();
+    delete[] peva;
+  }
+    
+  if (writeSwe == 1) { //  Snow store in landscape elements
+    unsigned short int * swe = new unsigned short int[numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"swe");
+    strcat(fileName,timeName);
+    fileSwe.open(fileName,ios::out | ios::binary);
+    if (!fileSwe.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
+    }
+    k=0;
+    while (k<numLand) {
+      if (DistHbv[k].GetSnowStore() > missingData) 
+      swe[k] = (unsigned short int) ((DistHbv[k].GetSnowStore() + DistHbv[k].GetMeltWater()) * 1000); //mm (ingjerd: kan ikke ha *10, da kan du gå over unsigned short int grensa på 65535
+    else
+      swe[k] = (unsigned short int) noData;
+    k++;
+    }
+    fileSwe.write(reinterpret_cast<char *>(swe), sizeof(unsigned short int)*numLand);
+    fileSwe.close();
+    delete [] swe;
+  }
+
+  if (writeWout == 1) {  //  water to soil (out of snowpack if snow, othwerwise prec
+    unsigned short int * wou = new unsigned short int[numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"wou");
+    strcat(fileName,timeName);
+    fileWou.open(fileName,ios::out | ios::binary);
+    if (!fileWou.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
+    }
+    k=0;
+    while (k<numLand) {
+      if (DistHbv[k].GetWaterOutput() > missingData) 
+	wou[k] = (unsigned short int) ((DistHbv[k].GetWaterOutput()) * 1000 * 10); //mm*10
+      else
+	wou[k] = (unsigned short int) noData;
+      k++;
+    }
+    fileWou.write(reinterpret_cast<char *>(wou), sizeof(unsigned short int)*numLand);
+    fileWou.close();
+    delete [] wou;
+  }
+
+  if (writeScf == 1) {  //  Snowcover fraction in landscape elements
+    unsigned short int * scf = new unsigned short int[numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"scf");
+    strcat(fileName,timeName);
+    fileScf.open(fileName,ios::out | ios::binary);
+    if (!fileScf.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
+    }
+    k=0;
+    while (k<numLand) {
+      if (DistHbv[k].GetSnowCoverFraction() > missingData) 
+	scf[k] = (unsigned short int) ((DistHbv[k].GetSnowCoverFraction()) * 10000); //prosent*100
+      else
+	scf[k] = (unsigned short int) noData;
+      k++;
+    }
+    fileScf.write(reinterpret_cast<char *>(scf), sizeof(unsigned short int)*numLand);
+    fileScf.close();
+    delete [] scf;
+  }
+   
+  if (writeSmw == 1) { //  Snow meltwater in landscape elements
+    unsigned short int * smw = new unsigned short int[numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"smw");
+    strcat(fileName,timeName);
+    fileSmw.open(fileName,ios::out | ios::binary);
+    if (!fileSmw.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
+    }
+    k=0;
+    while (k<numLand) {
       if (DistHbv[k].GetMeltWater() > missingData) 
-          // smw[k] = (float) ((DistHbv[k].GetMeltWater())*1000.0);
-	      smw[k] = (unsigned short int) ((DistHbv[k].GetMeltWater()) * 10000); //mm*10
+	smw[k] = (unsigned short int) ((DistHbv[k].GetMeltWater()) * 10000); //mm*10
       else
-          // smw[k] = (float) noData;
-	      smw[k] = (unsigned short int) noData;
+	smw[k] = (unsigned short int) noData;
       k++;
+    }
+    fileSmw.write(reinterpret_cast<char *>(smw), sizeof(unsigned short int)*numLand);
+    fileSmw.close();
+    delete [] smw;
   }
-/*        else {
-          smw[ELEMENT(i,j)] = noData;
-          }
-          }
-          else {
-          smw[ELEMENT(i,j)] = noData;
-          }
-          }
-          }*/
-  // fileSmw.write(reinterpret_cast<char *>(smw), sizeof(float)*numLand);
-  fileSmw.write(reinterpret_cast<char *>(smw), sizeof(unsigned short int)*numLand);
-  fileSmw.close();
-  delete [] smw;
-	}
  
-    if (writePET > 0) {
-  //  Runoff from landscape elements
-  //float * runoff = new float [numLand];
-  unsigned short int * runoff = new unsigned short int [numLand];
-  strcpy(fileName,dirName);
-  strcat(fileName,"run");
-  strcat(fileName,timeName);
-  fileRun.open(fileName,ios::out | ios::binary);
-  if (!fileRun.is_open()) {
-    cout << endl << "Error opening file " << fileName << endl << endl;
-    exit (1);
-  }
-  k=0;
-  /*  for (i=0; i<nRows; i++) {
-      for (j=0; j<nCols; j++) {*/
-  while (k<numLand) {
-//        if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
+  if (writeRun == 1) { //  Runoff from landscape elements
+    float * runoff = new float [numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"run");
+    strcat(fileName,timeName);
+    fileRun.open(fileName,ios::out | ios::binary);
+    if (!fileRun.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
+    }
+    k=0;
+    while (k<numLand) {
       if (DistHbv[k].GetRunoff() > missingData) 
-          //runoff[k] = (float) ((DistHbv[k].GetRunoff())*1000.0);
-          runoff[k] = (unsigned short int) ((DistHbv[k].GetRunoff())*1000.0*10.);
+	runoff[k] = (float) ((DistHbv[k].GetRunoff())*1000.0);
       else
-         // runoff[k] = (float) noData;
-         runoff[k] = (unsigned short int) noData;
+	runoff[k] = (float) noData;
       k++;
+    }
+    fileRun.write(reinterpret_cast<char *>(runoff), sizeof(float)*numLand);
+    fileRun.close();
+    delete [] runoff;
   }
-/*        else {
-          runoff[ELEMENT(i,j)] = noData;
-          }
-          }
-          else {
-          runoff[ELEMENT(i,j)] = noData;
-          }
-          }
-          }*/
-  //fileRun.write(reinterpret_cast<char *>(runoff), sizeof(float)*numLand);
-  fileRun.write(reinterpret_cast<char *>(runoff), sizeof(unsigned short int)*numLand);
-  fileRun.close();
-  delete [] runoff;
-	}
   
   //  Discharge from landscape elements
   /* float * hbv = new float [numLand];
@@ -2623,190 +2986,191 @@ void WriteBinaryGrid(DistributedHbv * const DistHbv, DateTime datetime, int numL
     exit (1);
   }
   k=0;
-  /*  for (i=0; i<nRows; i++) {
-      for (j=0; j<nCols; j++) {*/
   /* while (k<numLand) {
-//        if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-      if (DistHbv[k].GetDischarge() > missingData) 
-          hbv[k] = (float) (DistHbv[k].GetDischarge());
-      else
-          hbv[k] = (float) noData;
-      k++;
+  if (DistHbv[k].GetDischarge() > missingData) 
+  hbv[k] = (float) (DistHbv[k].GetDischarge());
+  else
+  hbv[k] = (float) noData;
+  k++;
   }
-/*        else {
-          hbv[ELEMENT(i,j)] = noData;
-          }
-          }
-          else {
-          hbv[ELEMENT(i,j)] = noData;
-          }
-          }
-          }*/
   /* fileHbv.write(reinterpret_cast<char *>(hbv), sizeof(float)*numLand);
   fileHbv.close();
   delete [] hbv; */
   
-    if (writePET > 0) {
-  //  Soil moisture deficit in landscape elements
-  //float * hsd = new float [numLand];
-  unsigned short int * hsd = new unsigned short int [numLand];
-  strcpy(fileName,dirName);
-  strcat(fileName,"hsd");
-  strcat(fileName,timeName);
-  fileHsd.open(fileName,ios::out | ios::binary);
-  if (!fileHsd.is_open()) {
-    cout << endl << "Error opening file " << fileName << endl << endl;
-    exit (1);
-  }
-  k=0;
-  /*  for (i=0; i<nRows; i++) {
-      for (j=0; j<nCols; j++) {*/
-  while (k<numLand) {
-//        if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-    if (DistHbv[k].GetHbvSoilMoistureDeficit() > missingData) {
-      if (DistHbv[k].GetHbvSoilMoistureDeficit() >= 0.0)
-        //hsd[k] = (float) ((DistHbv[k].GetHbvSoilMoistureDeficit())*1000.0);
-        hsd[k] = (unsigned short int) ((DistHbv[k].GetHbvSoilMoistureDeficit())*1000.0*10.);
-      else
-        hsd[k] = 0;
+  if (writeHsd == 1) {   //  Soil moisture deficit in landscape elements
+    unsigned short int * hsd = new unsigned short int [numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"hsd");
+    strcat(fileName,timeName);
+    fileHsd.open(fileName,ios::out | ios::binary);
+    if (!fileHsd.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
     }
-    else
-      //hsd[k] = (float) noData;
-      hsd[k] = (unsigned short int) noData;
-    k++;
-  }
-/*        else {
-          hsd[ELEMENT(i,j)] = noData;
-          }
-          }
-          else {
-          hsd[ELEMENT(i,j)] = noData;
-          }
-          }
-          }*/
-  //fileHsd.write(reinterpret_cast<char *>(hsd), sizeof(float)*numLand);
-  fileHsd.write(reinterpret_cast<char *>(hsd), sizeof(unsigned short int)*numLand);
-  fileHsd.close();
-  delete [] hsd;
-	}
-  
-    if (writePET > 0) {
-  //  Soil moisture in landscape elements
-  //float * hsm = new float [numLand];
-  unsigned short int * hsm = new unsigned short int [numLand];
-  strcpy(fileName,dirName);
-  strcat(fileName,"hsm");
-  strcat(fileName,timeName);
-  fileHsm.open(fileName,ios::out | ios::binary);
-  if (!fileHsm.is_open()) {
-    cout << endl << "Error opening file " << fileName << endl << endl;
-    exit (1);
-  }
-  k=0;
-  /*  for (i=0; i<nRows; i++) {
-      for (j=0; j<nCols; j++) {*/
-  while (k<numLand) {
-//        if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-    if (DistHbv[k].GetHbvSoilMoistureDeficit() > missingData) {
-      if (DistHbv[k].GetHbvSoilMoistureDeficit() >= 0.0)
-        //hsm[k] = (float) ((DistHbv[k].GetHbvSoilMoisture())*1000.0);
-        hsm[k] = (unsigned short int) ((DistHbv[k].GetHbvSoilMoisture())*1000.0*10.);
+    k=0;
+    while (k<numLand) {
+      if (DistHbv[k].GetHbvSoilMoistureDeficit() > missingData) {
+	if (DistHbv[k].GetHbvSoilMoistureDeficit() >= 0.0)
+	  hsd[k] = (unsigned short int) ((DistHbv[k].GetHbvSoilMoistureDeficit())*1000.0*10.);
+	else
+	  hsd[k] = 0;
+      }
       else
-        hsm[k] = (unsigned short int) 0;
+	hsd[k] = (unsigned short int) noData;
+      k++;
     }
-    else
-      //hsm[k] = (float) noData;
-      hsm[k] = (unsigned short int) noData;
-    k++;
+    fileHsd.write(reinterpret_cast<char *>(hsd), sizeof(unsigned short int)*numLand);
+    fileHsd.close();
+    delete [] hsd;
   }
-/*        else {
-          hsm[ELEMENT(i,j)] = noData;
-          }
-          }
-          else {
-          hsm[ELEMENT(i,j)] = noData;
-          }
-          }
-          }*/
-  //fileHsm.write(reinterpret_cast<char *>(hsm), sizeof(float)*numLand);
-  fileHsm.write(reinterpret_cast<char *>(hsm), sizeof(unsigned short int)*numLand);
-  fileHsm.close();
-  delete [] hsm;
-	}
   
-    if (writePET > 0) {
-  //  Groundwater in landscape elements
-  // float * hgw = new float [numLand];
-  unsigned short int * hgw = new unsigned short int[numLand];
-  strcpy(fileName,dirName);
-  strcat(fileName,"hgw");
-  strcat(fileName,timeName);
-  fileHgw.open(fileName,ios::out | ios::binary);
-  if (!fileHgw.is_open()) {
-    cout << endl << "Error opening file " << fileName << endl << endl;
-    exit (1);
+  if (writeHsm == 1) {  //  Soil moisture in landscape elements
+    unsigned short int * hsm = new unsigned short int [numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"hsm");
+    strcat(fileName,timeName);
+    fileHsm.open(fileName,ios::out | ios::binary);
+    if (!fileHsm.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
+    }
+    k=0;
+    while (k<numLand) {
+      if (DistHbv[k].GetHbvSoilMoisture() > missingData) {
+	if (DistHbv[k].GetHbvSoilMoisture() >= 0.0)
+	  hsm[k] = (unsigned short int) ((DistHbv[k].GetHbvSoilMoisture())*1000.0*10.);
+	else
+	  hsm[k] = (unsigned short int) 0;
+      }
+      else
+	hsm[k] = (unsigned short int) noData;
+      k++;
+    }
+    fileHsm.write(reinterpret_cast<char *>(hsm), sizeof(unsigned short int)*numLand);
+    fileHsm.close();
+    delete [] hsm;
   }
-  k=0;
-  /*  for (i=0; i<nRows; i++) {
-      for (j=0; j<nCols; j++) {*/
-  while (k<numLand) {
-    //        if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
+  
+  if (writeHgw == 1) {  //  Groundwater in landscape elements
+    unsigned short int * hgw = new unsigned short int[numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"hgw");
+    strcat(fileName,timeName);
+    fileHgw.open(fileName,ios::out | ios::binary);
+    if (!fileHgw.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
+    }
+    k=0;
+    while (k<numLand) {
       if (DistHbv[k].GetHbvUpperZone() > missingData && DistHbv[k].GetHbvLowerZone() > missingData) 
-          // hgw[k] = (float) ((DistHbv[k].GetHbvUpperZone() + DistHbv[k].GetHbvLowerZone())*1000.0);
-	      hgw[k] = (unsigned short int) ((DistHbv[k].GetHbvUpperZone() + DistHbv[k].GetHbvLowerZone()) * 10000); //mm *10
+	hgw[k] = (unsigned short int) ((DistHbv[k].GetHbvUpperZone() + DistHbv[k].GetHbvLowerZone()) * 10000); //mm *10
       else
-          // hgw[k] = (float) noData;
-	      hgw[k] = (unsigned short int) noData;
+	hgw[k] = (unsigned short int) noData;
       k++;
+    }
+    fileHgw.write(reinterpret_cast<char *>(hgw), sizeof(unsigned short int)*numLand);
+    fileHgw.close();
+    delete [] hgw;
   }
-/*        else {
-          hgw[ELEMENT(i,j)] = noData;
-          }
-          }
-          else {
-          hgw[ELEMENT(i,j)] = noData;
-          }
-          }
-          }*/
-  // fileHgw.write(reinterpret_cast<char *>(hgw), sizeof(float)*numLand);
-  fileHgw.write(reinterpret_cast<char *>(hgw), sizeof(unsigned short int)*numLand);
-  fileHgw.close();
-  delete [] hgw;
-	}
   
-  //  Lower zone groundwater in landscape elements
-  /*float * hlz = new float [numLand];
-  strcpy(fileName,dirName);
-  strcat(fileName,"hlz");
-  strcat(fileName,timeName);
-  fileHlz.open(fileName,ios::out | ios::binary);
-  if (!fileHlz.is_open()) {
-    cout << endl << "Error opening file " << fileName << endl << endl;
-    exit (1);
-  }
-  k=0;
-  /*  for (i=0; i<nRows; i++) {
-      for (j=0; j<nCols; j++) {*/
-  /* while (k<numLand) {
-//        if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-      if (DistHbv[k].GetHbvLowerZone() > missingData) 
-          hlz[k] = (float) ((DistHbv[k].GetHbvLowerZone())*1000.0);
-      else
-          hlz[k] = (float) noData;
+  if (writeHlz == 1) {  //  Lower zone groundwater in landscape elements
+    unsigned short int * hlz = new unsigned short int[numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"hlz");
+    strcat(fileName,timeName);
+    fileHlz.open(fileName,ios::out | ios::binary);
+    if (!fileHlz.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
+    }
+    k=0;
+    while (k<numLand) {
+      if (DistHbv[k].GetHbvLowerZone() > missingData) { 
+	hlz[k] = (unsigned short int) ((DistHbv[k].GetHbvLowerZone()) * 10000); //mm *10
+      }
+      else {
+	hlz[k] = (unsigned short int) noData;
+      }
       k++;
+    }
+    fileHlz.write(reinterpret_cast<char *>(hlz), sizeof(unsigned short int)*numLand);
+    fileHlz.close();
+    delete [] hlz; 
   }
-/*        else {
-          hlz[ELEMENT(i,j)] = noData;
-          }
-          }
-          else {
-          hlz[ELEMENT(i,j)] = noData;
-          }
-          }
-  }*/
-  /* fileHlz.write(reinterpret_cast<char *>(hlz), sizeof(float)*numLand);
-  fileHlz.close();
-  delete [] hlz; */
+
+  if (writeHuz == 1) {  //  Upper zone groundwater in landscape elements
+    unsigned short int * huz = new unsigned short int[numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"huz");
+    strcat(fileName,timeName);
+    fileHuz.open(fileName,ios::out | ios::binary);
+    if (!fileHuz.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
+    }
+    k=0;
+    while (k<numLand) {
+      if (DistHbv[k].GetHbvUpperZone() > missingData) { 
+	huz[k] = (unsigned short int) ((DistHbv[k].GetHbvUpperZone()) * 10000); //mm *10
+      }
+      else {
+	huz[k] = (unsigned short int) noData;
+      }
+      k++;
+    }
+    fileHuz.write(reinterpret_cast<char *>(huz), sizeof(unsigned short int)*numLand);
+    fileHuz.close();
+    delete [] huz; 
+  }
+
+  
+  if (writeLak == 1) {  //Lake storage in landscape elements
+    unsigned short int * lak = new unsigned short int[numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"lak");
+    strcat(fileName,timeName);
+    fileLak.open(fileName,ios::out | ios::binary);
+    if (!fileLak.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
+    }
+    k=0;
+    while (k<numLand) {
+      if (DistHbv[k].GetLakeStorage() > missingData)  
+	lak[k] = (unsigned short int) ((DistHbv[k].GetLakeStorage()) * 10000); //mm *10
+      else 
+	lak[k] = (unsigned short int) noData;
+      k++;
+    }
+    fileLak.write(reinterpret_cast<char *>(lak), sizeof(unsigned short int)*numLand);
+    fileLak.close();
+    delete [] lak; 
+  }
+  
+   if (writeGmb == 1) {  //Glacier mass balance in landscape elements
+    unsigned short int * gmb = new unsigned short int[numLand];
+    strcpy(fileName,dirName);
+    strcat(fileName,"gmb");
+    strcat(fileName,timeName);
+    fileGmb.open(fileName,ios::out | ios::binary);
+    if (!fileGmb.is_open()) {
+      cout << endl << "Error opening file " << fileName << endl << endl;
+      exit (1);
+    }
+    k=0;
+    while (k<numLand) {
+      if (DistHbv[k].GetGlacierMassBalance() > missingData)  
+	gmb[k] = (unsigned short int) ((DistHbv[k].GetGlacierMassBalance()) * 10000); //mm *10
+      else 
+	gmb[k] = (unsigned short int) noData;
+      k++;
+    }
+    fileGmb.write(reinterpret_cast<char *>(gmb), sizeof(unsigned short int)*numLand);
+    fileGmb.close();
+    delete [] gmb; 
+  }
+    
 }
 
 
@@ -2820,475 +3184,266 @@ void WriteAsciiGrid(DistributedHbv * const DistHbv, DateTime datetime, int numLa
   sprintf(timeName,"_%04d_%02d_%02d.asc",datetime.getYear(),datetime.getMonth(),datetime.getDay());
 
   //  fout << "Temperature in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"tem");
+  strcpy(fileName,"hbv_output/tem");
   strcat(fileName,timeName);
   ofstream fileTemp(fileName);
   if (!fileTemp.is_open()) {
     cout << endl << "Error opening file " << fileName << endl << endl;
     exit (1);
   }
-  fileTemp << "ncols         " << nCols << endl;
-  fileTemp << "nrows         " << nRows << endl;
-  fileTemp << "xllcorner     " << xllCorner << endl;
-  fileTemp << "yllcorner     " << yllCorner << endl;
-  fileTemp << "cellsize      " << cellSize << endl;
-  fileTemp << "NODATA_value  " << noData << endl;
   k=0;
   for (i=0; i<nRows; i++) {
     for (j=0; j<nCols; j++) {
       if (k<numLand) {
         if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-          if (DistHbv[k].GetTemperature() > missingData) {
             fileTemp.width(15); fileTemp.precision(5); fileTemp.setf(ios::showpoint); fileTemp.setf(ios::fixed); 
-            fileTemp << (DistHbv[k].GetTemperature()) << endl;
-          }
-          else {
-            fileTemp.width(15); fileTemp << noData << endl;
-          }
+            fileTemp <<  i << "\t" << j << "\t"  << k << "\t"  <<  (DistHbv[k].GetTemperature()) << endl;
           k++;
         }
-        else {
-          fileTemp.width(15); fileTemp << noData << endl;
-        }
-      }
-      else {
-        fileTemp.width(15); fileTemp << noData << endl;
       }
     }
   }
   fileTemp.close();
 
-  //  fout << "Precipitation in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"pre");
+  fout << "Precipitation in landscape elements at time step " << timeStep << ":\n";
+  strcpy(fileName,"hbv_output/pre");
   strcat(fileName,timeName);
   ofstream filePrec(fileName);
   if (!filePrec.is_open()) {
     cout << endl << "Error opening file " << fileName << endl << endl;
     exit (1);
   }
-  filePrec << "ncols         " << nCols << endl;
-  filePrec << "nrows         " << nRows << endl;
-  filePrec << "xllcorner     " << xllCorner << endl;
-  filePrec << "yllcorner     " << yllCorner << endl;
-  filePrec << "cellsize      " << cellSize << endl;
-  filePrec << "NODATA_value  " << noData << endl;
+  //  cout << endl << " file " << fileName << endl;
   k=0;
   for (i=0; i<nRows; i++) {
     for (j=0; j<nCols; j++) {
       if (k<numLand) {
         if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-          if (DistHbv[k].GetPrecipitation() > missingData) {
             filePrec.width(15); filePrec.precision(5); filePrec.setf(ios::showpoint); filePrec.setf(ios::fixed); 
-            filePrec << (DistHbv[k].GetPrecipitation())*1000.0 << endl;
-          }
-          else {
-            filePrec.width(15); filePrec << noData << endl;
-          }
+            filePrec <<  i << "\t" << j << "\t"  << k << "\t"  <<  (DistHbv[k].GetPrecipitation())*1000.0 << endl;
           k++;
         }
-        else {
-          filePrec.width(15); filePrec << noData << endl;
-        }
-      }
-      else {
-        filePrec.width(15); filePrec << noData << endl;
       }
     }
   }
   filePrec.close();
 
   //  fout << "Evapotranspiration from landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"eva");
+  strcpy(fileName,"hbv_output/eva");
   strcat(fileName,timeName);
   ofstream fileEvap(fileName);
   if (!fileEvap.is_open()) {
     cout << endl << "Error opening file " << fileName << endl << endl;
     exit (1);
   }
-  fileEvap << "ncols         " << nCols << endl;
-  fileEvap << "nrows         " << nRows << endl;
-  fileEvap << "xllcorner     " << xllCorner << endl;
-  fileEvap << "yllcorner     " << yllCorner << endl;
-  fileEvap << "cellsize      " << cellSize << endl;
-  fileEvap << "NODATA_value  " << noData << endl;
   k=0;
   for (i=0; i<nRows; i++) {
     for (j=0; j<nCols; j++) {
       if (k<numLand) {
         if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-	  //          if (DistHbv[k].GetInterceptionLoss() > missingData &&
-	  //              DistHbv[k].GetTranspSoilEvap() > missingData &&
-	  //              DistHbv[k].GetLakeEvap() > missingData) {
-	  if (DistHbv[k].GetEvapotranspiration() > missingData) {
             fileEvap.width(15); fileEvap.precision(5); fileEvap.setf(ios::showpoint); fileEvap.setf(ios::fixed); 
-	    //            fileEvap << (DistHbv[k].GetInterceptionLoss() + DistHbv[k].GetTranspSoilEvap() + 
-	    //                         DistHbv[k].GetLakeEvap())*1000.0 << endl;
-	    fileEvap << (DistHbv[k].GetEvapotranspiration())*1000.0 << endl;
-          }
-          else {
-            fileEvap.width(15); fileEvap << noData << endl;
-          }
+	    fileEvap <<  i << "\t" << j << "\t"  << k << "\t"  << (DistHbv[k].GetEvapotranspiration())*1000.0 << endl;
          k++;
         }
-        else {
-          fileEvap.width(15); fileEvap << noData << endl;
-        }
-      }
-      else {
-        fileEvap.width(15); fileEvap << noData << endl;
       }
     }
   }
   fileEvap.close();
   
   //  fout << "Snow store in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"swe");
+  strcpy(fileName,"hbv_output/swe");
   strcat(fileName,timeName);
   ofstream fileSwe(fileName);
   if (!fileSwe.is_open()) {
     cout << endl << "Error opening file " << fileName << endl << endl;
     exit (1);
   }
-  fileSwe << "ncols         " << nCols << endl;
-  fileSwe << "nrows         " << nRows << endl;
-  fileSwe << "xllcorner     " << xllCorner << endl;
-  fileSwe << "yllcorner     " << yllCorner << endl;
-  fileSwe << "cellsize      " << cellSize << endl;
-  fileSwe << "NODATA_value  " << noData << endl;
   k=0;
   for (i=0; i<nRows; i++) {
     for (j=0; j<nCols; j++) {
       if (k<numLand) {
         if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-          if (DistHbv[k].GetSnowStore() > missingData) {
             fileSwe.width(15); fileSwe.precision(5); fileSwe.setf(ios::showpoint); fileSwe.setf(ios::fixed); 
-            fileSwe << (DistHbv[k].GetSnowStore()+DistHbv[k].GetMeltWater())*1000.0 << endl;
-          }
-          else {
-            fileSwe.width(15); fileSwe << noData << endl;
-          }
+            fileSwe <<  i << "\t" << j << "\t"  << k << "\t"  << (DistHbv[k].GetSnowStore()+DistHbv[k].GetMeltWater())*1000.0 << endl;
           k++;
         }
-        else {
-          fileSwe.width(15); fileSwe << noData << endl;
-        }
-      }
-      else {
-        fileSwe.width(15); fileSwe << noData << endl;
       }
     }
   }
   fileSwe.close();
   
   //  fout << "Snowcover fraction in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"scf");
+  strcpy(fileName,"hbv_output/scf");
   strcat(fileName,timeName);
   ofstream fileScf(fileName);
   if (!fileScf.is_open()) {
     cout << endl << "Error opening file " << fileName << endl << endl;
     exit (1);
   }
-  fileScf << "ncols         " << nCols << endl;
-  fileScf << "nrows         " << nRows << endl;
-  fileScf << "xllcorner     " << xllCorner << endl;
-  fileScf << "yllcorner     " << yllCorner << endl;
-  fileScf << "cellsize      " << cellSize << endl;
-  fileScf << "NODATA_value  " << noData << endl;
   k=0;
   for (i=0; i<nRows; i++) {
     for (j=0; j<nCols; j++) {
       if (k<numLand) {
         if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-          if (DistHbv[k].GetSnowCoverFraction() > missingData) {
             fileScf.width(15); fileScf.precision(5); fileScf.setf(ios::showpoint); fileScf.setf(ios::fixed); 
-            fileScf << (DistHbv[k].GetSnowCoverFraction())*100.0 << endl;
-          }
-          else {
-            fileScf.width(15); fileScf << noData << endl;
-          }
+            fileScf <<  i << "\t" << j << "\t"  << k << "\t"  << (DistHbv[k].GetSnowCoverFraction())*100.0 << endl;
           k++;
         }
-        else {
-          fileScf.width(15); fileScf << noData << endl;
-        }
-      }
-      else {
-        fileScf.width(15); fileScf << noData << endl;
       }
     }
   }
   fileScf.close();
   
   //  fout << "Snow meltwater in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"smw");
+  strcpy(fileName,"hbv_output/smw");
   strcat(fileName,timeName);
   ofstream fileSmw(fileName);
   if (!fileSmw.is_open()) {
     cout << endl << "Error opening file " << fileName << endl << endl;
     exit (1);
   }
-  fileSmw << "ncols         " << nCols << endl;
-  fileSmw << "nrows         " << nRows << endl;
-  fileSmw << "xllcorner     " << xllCorner << endl;
-  fileSmw << "yllcorner     " << yllCorner << endl;
-  fileSmw << "cellsize      " << cellSize << endl;
-  fileSmw << "NODATA_value  " << noData << endl;
   k=0;
   for (i=0; i<nRows; i++) {
     for (j=0; j<nCols; j++) {
       if (k<numLand) {
         if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-          if (DistHbv[k].GetMeltWater() > missingData) {
             fileSmw.width(15); fileSmw.precision(5); fileSmw.setf(ios::showpoint); fileSmw.setf(ios::fixed); 
-            fileSmw << (DistHbv[k].GetMeltWater())*1000.0 << endl;
-          }
-          else {
-            fileSmw.width(15); fileSmw << noData << endl;
-          }
+            fileSmw <<  i << "\t" << j << "\t"  << k << "\t"  << (DistHbv[k].GetMeltWater())*1000.0 << endl;
           k++;
         }
-        else {
-          fileSmw.width(15); fileSmw << noData << endl;
-        }
-      }
-      else {
-        fileSmw.width(15); fileSmw << noData << endl;
       }
     }
   }
   fileSmw.close();
   
   //  fout << "Runoff from landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"run");
+  strcpy(fileName,"hbv_output/run");
   strcat(fileName,timeName);
   ofstream fileRunoff(fileName);
   if (!fileRunoff.is_open()) {
     cout << endl << "Error opening file " << fileName << endl << endl;
     exit (1);
   }
-  fileRunoff << "ncols         " << nCols << endl;
-  fileRunoff << "nrows         " << nRows << endl;
-  fileRunoff << "xllcorner     " << xllCorner << endl;
-  fileRunoff << "yllcorner     " << yllCorner << endl;
-  fileRunoff << "cellsize      " << cellSize << endl;
-  fileRunoff << "NODATA_value  " << noData << endl;
   k=0;
   for (i=0; i<nRows; i++) {
     for (j=0; j<nCols; j++) {
       if (k<numLand) {
         if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-          if (DistHbv[k].GetRunoff() > missingData) {
             fileRunoff.width(15); fileRunoff.precision(5); fileRunoff.setf(ios::showpoint); fileRunoff.setf(ios::fixed); 
-            fileRunoff << (DistHbv[k].GetRunoff())*1000.0 << endl;
-          }
-          else {
-            fileRunoff.width(15); fileRunoff << noData << endl;
-          }
+            fileRunoff <<  i << "\t" << j << "\t"  << k << "\t"  << (DistHbv[k].GetRunoff())*1000.0 << endl;
           k++;
         }
-        else {
-          fileRunoff.width(15); fileRunoff << noData << endl;
-        }
-      }
-      else {
-        fileRunoff.width(15); fileRunoff << noData << endl;
       }
     }
   }
   fileRunoff.close();
   
   //  fout << "Discharge from landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hbv");
+  strcpy(fileName,"hbv_output/hbv");
   strcat(fileName,timeName);
   ofstream fileDisch(fileName);
   if (!fileDisch.is_open()) {
     cout << endl << "Error opening file " << fileName << endl << endl;
     exit (1);
   }
-  fileDisch << "ncols         " << nCols << endl;
-  fileDisch << "nrows         " << nRows << endl;
-  fileDisch << "xllcorner     " << xllCorner << endl;
-  fileDisch << "yllcorner     " << yllCorner << endl;
-  fileDisch << "cellsize      " << cellSize << endl;
-  fileDisch << "NODATA_value  " << noData << endl;
   k=0;
   for (i=0; i<nRows; i++) {
     for (j=0; j<nCols; j++) {
       if (k<numLand) {
         if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-          if (DistHbv[k].GetDischarge() > missingData) {
             fileDisch.width(15); fileDisch.precision(5); fileDisch.setf(ios::showpoint); fileDisch.setf(ios::fixed); 
-            fileDisch << DistHbv[k].GetDischarge() << endl;
-          }
-          else {
-            fileDisch.width(15); fileDisch << noData << endl;
-          }
+            fileDisch <<  i << "\t" << j << "\t"  << k << "\t"  << DistHbv[k].GetDischarge() << endl;
           k++;
         }
-        else {
-          fileDisch.width(15); fileDisch << noData << endl;
-        }
-      }
-      else {
-        fileDisch.width(15); fileDisch << noData << endl;
       }
     }
   }
   fileDisch.close();
   
   //  fout << "Soil moisture deficit in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hsd");
+  strcpy(fileName,"hbv_output/hsd");
   strcat(fileName,timeName);
   ofstream fileHsd(fileName);
   if (!fileHsd.is_open()) {
     cout << endl << "Error opening file " << fileName << endl << endl;
     exit (1);
   }
-  fileHsd << "ncols         " << nCols << endl;
-  fileHsd << "nrows         " << nRows << endl;
-  fileHsd << "xllcorner     " << xllCorner << endl;
-  fileHsd << "yllcorner     " << yllCorner << endl;
-  fileHsd << "cellsize      " << cellSize << endl;
-  fileHsd << "NODATA_value  " << noData << endl;
   k=0;
   for (i=0; i<nRows; i++) {
     for (j=0; j<nCols; j++) {
       if (k<numLand) {
         if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-          if (DistHbv[k].GetHbvSoilMoisture() > missingData) {
             fileHsd.width(15); fileHsd.precision(5); fileHsd.setf(ios::showpoint); fileHsd.setf(ios::fixed);
-            fileHsd << (DistHbv[k].GetHbvSoilMoistureDeficit())*1000.0 << endl;
-          }
-          else {
-            fileHsd.width(15); fileHsd << noData << endl;
-          }
+            fileHsd <<  i << "\t" << j << "\t"  << k << "\t"  << (DistHbv[k].GetHbvSoilMoistureDeficit())*1000.0 << endl;
           k++;
         }
-        else {
-          fileHsd.width(15); fileHsd << noData << endl;
-        }
-      }
-      else {
-        fileHsd.width(15); fileHsd << noData << endl;
       }
     }
   }
   fileHsd.close();
   
   //  fout << "Soil moisture in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hsm");
+  strcpy(fileName,"hbv_output/hsm");
   strcat(fileName,timeName);
   ofstream fileHsm(fileName);
   if (!fileHsm.is_open()) {
     cout << endl << "Error opening file " << fileName << endl << endl;
     exit (1);
   }
-  fileHsm << "ncols         " << nCols << endl;
-  fileHsm << "nrows         " << nRows << endl;
-  fileHsm << "xllcorner     " << xllCorner << endl;
-  fileHsm << "yllcorner     " << yllCorner << endl;
-  fileHsm << "cellsize      " << cellSize << endl;
-  fileHsm << "NODATA_value  " << noData << endl;
   k=0;
   for (i=0; i<nRows; i++) {
     for (j=0; j<nCols; j++) {
       if (k<numLand) {
         if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-          if (DistHbv[k].GetHbvSoilMoisture() > missingData) {
             fileHsm.width(15); fileHsm.precision(5); fileHsm.setf(ios::showpoint); fileHsm.setf(ios::fixed);
-            fileHsm << (DistHbv[k].GetHbvSoilMoisture())*1000.0 << endl;
-          }
-          else {
-            fileHsm.width(15); fileHsm << noData << endl;
-          }
+            fileHsm <<  i << "\t" << j << "\t"  << k << "\t"  << (DistHbv[k].GetHbvSoilMoisture())*1000.0 << endl;
           k++;
         }
-        else {
-          fileHsm.width(15); fileHsm << noData << endl;
-        }
-      }
-      else {
-        fileHsm.width(15); fileHsm << noData << endl;
       }
     }
   }
   fileHsm.close();
   
   //  fout << "Upper zone in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"huz");
+  strcpy(fileName,"hbv_output/huz");
   strcat(fileName,timeName);
   ofstream fileHuz(fileName);
   if (!fileHuz.is_open()) {
     cout << endl << "Error opening file " << fileName << endl << endl;
     exit (1);
   }
-  fileHuz << "ncols         " << nCols << endl;
-  fileHuz << "nrows         " << nRows << endl;
-  fileHuz << "xllcorner     " << xllCorner << endl;
-  fileHuz << "yllcorner     " << yllCorner << endl;
-  fileHuz << "cellsize      " << cellSize << endl;
-  fileHuz << "NODATA_value  " << noData << endl;
   k=0;
   for (i=0; i<nRows; i++) {
     for (j=0; j<nCols; j++) {
       if (k<numLand) {
         if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-          if (DistHbv[k].GetHbvUpperZone() > missingData) {
             fileHuz.width(15); fileHuz.precision(5); fileHuz.setf(ios::showpoint); fileHuz.setf(ios::fixed);
-            fileHuz << (DistHbv[k].GetHbvUpperZone())*1000.0 << endl;
-          }
-          else {
-            fileHuz.width(15); fileHuz << noData << endl;
-          }
+            fileHuz <<  i << "\t" << j << "\t"  << k << "\t"  << (DistHbv[k].GetHbvUpperZone())*1000.0 << endl;
           k++;
         }
-        else {
-          fileHuz.width(15); fileHuz << noData << endl;
-        }
-      }
-      else {
-        fileHuz.width(15); fileHuz << noData << endl;
       }
     }
-    fileHuz << endl;
   }
   fileHuz << endl;
   fileHuz.close();
   
   //  fout << "Lower zone in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hlz");
+  strcpy(fileName,"hbv_output/hlz");
   strcat(fileName,timeName);
   ofstream fileHlz(fileName);
   if (!fileHlz.is_open()) {
     cout << endl << "Error opening file " << fileName << endl << endl;
     exit (1);
   }
-  fileHlz << "ncols         " << nCols << endl;
-  fileHlz << "nrows         " << nRows << endl;
-  fileHlz << "xllcorner     " << xllCorner << endl;
-  fileHlz << "yllcorner     " << yllCorner << endl;
-  fileHlz << "cellsize      " << cellSize << endl;
-  fileHlz << "NODATA_value  " << noData << endl;
   k=0;
   for (i=0; i<nRows; i++) {
     for (j=0; j<nCols; j++) {
       if (k<numLand) {
         if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-          if (DistHbv[k].GetHbvLowerZone() > missingData) {
             fileHlz.width(15); fileHlz.precision(5); fileHlz.setf(ios::showpoint); fileHlz.setf(ios::fixed);
-            fileHlz << (DistHbv[k].GetHbvLowerZone())*1000.0 << endl;
-          }
-          else {
-            fileHlz.width(15); fileHlz << noData << endl;
-          }
+            fileHlz <<  i << "\t" << j << "\t"  << k << "\t"  << (DistHbv[k].GetHbvLowerZone())*1000.0 << endl;
           k++;
         }
-        else {
-          fileHlz.width(15); fileHlz << noData << endl;
-        }
-      }
-      else {
-        fileHlz.width(15); fileHlz << noData << endl;
       }
     }
   }
@@ -3305,7 +3460,7 @@ void WriteAsciiGridWaterBalance(DistributedHbv * const DistHbv, DateTime startSi
     char dirName[100];
     char timeName[100];
   
-    sprintf(dirName,"./");
+    sprintf(dirName,"./hbv_output/");
     sprintf(timeName,"_%04d_%02d_%02d_%04d_%02d_%02d.asc",startSimulationTime.getYear(),startSimulationTime.getMonth(),startSimulationTime.getDay(),
   	  endSimulationTime.getYear(),endSimulationTime.getMonth(),endSimulationTime.getDay());
   
@@ -3509,7 +3664,7 @@ void WriteAsciiGridWaterBalance(DistributedHbv * const DistHbv, DateTime startSi
                         fileChange.precision(5); 
                         fileChange.setf(ios::showpoint); 
                         fileChange.setf(ios::fixed); 
-                        fileChange << (DistHbv[k].GetFinalStorage()-DistHbv[k].GetInitialStorage())/DistHbv[k].GetNumberSum()*numberDaysPerYear*1000.0 << endl;
+                        fileChange << (DistHbv[k].GetFinalStorage()-DistHbv[k].GetInitialStorage())*1000.0 << endl;
                     }
                     else 
                     {

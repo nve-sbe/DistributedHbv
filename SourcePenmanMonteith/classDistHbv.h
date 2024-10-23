@@ -25,17 +25,14 @@ using namespace std;
 enum LANDSURFACE { SURF0, SURF1, SURF2, SURF3, SURF4, SURF5, SURF6, SURF7, SURF8, SURF9,  
                    SURF10, SURF11, SURF12, SURF13, SURF14, SURF15, SURF16, SURF17, SURF18, SURF19, 
                    GLACIER };
-enum SOIL { SOIL0, SOIL1, SOIL2, SOIL3, SOIL4, SOIL5, SOIL6, SOIL7, SOIL8, SOIL9, 
-            SOIL10, SOIL11, SOIL12, SOIL13, SOIL14, SOIL15, SOIL16, SOIL17, SOIL18, SOIL19, 
-            GLACIER_BED };
+enum SOIL { SOIL0, SOIL1, SOIL2, SOIL3, SOIL4, SOIL5, GLACIER_BED }; //NB! Navn i hbv_soil_parameters.dta må stemme overens med disse
 #define _USE_MATH_DEFINES   //pi
 #define ELEMENT(a,b) (((a)*nCols)+(b))
 const int numberPotentialEvaporationValuesPerYear=12;      // Number of long-term mean potential evaporation values per year
 const int maximumNumberLandClasses=3;        // Maximum number of land/soil classes in use for each computational element
 //const int numberLandSurfaceClasses=7;        // All possible land surface types including glaciers, excluding lakes
-//const int numberSoilClasses=7;               // All possible soil/subsurface types including glaciers, excluding lakes
 const int numberLandSurfaceClasses=21;       // All possible land surface types including glaciers, excluding lakes
-const int numberSoilClasses=21;              // All possible soil/subsurface types including glaciers, excluding lakes
+const int numberSoilClasses=7;              // All possible soil/subsurface types including glaciers, excluding lakes
 const int maximumCorrectionCatchments=1000;
 const int numberInputSeries=7;
 const int numberSnowClasses=9;
@@ -457,7 +454,7 @@ class Vegetation
   double tempMin;                          // minimum temperature (deg. C)
   double wind1;                            // wind speed (m/s)
   double radiationS;                      // solar radiation (MJ/m2/day)
-  double vp;                     // actual vapor pressure (Pa)
+  double vp;                              // actual vapor pressure (Pa)
   double potev;                            /*  Potential evapotranspiration (m/timestep)  */
   double prevInterception;                 /*  Interception from previous time step (m)  */
   double interceptionStore;                /*  Interception store (m)  */
@@ -1006,7 +1003,6 @@ class DistributedHbv
   double GetSumPrecipitation() const;
   double GetSumEvapotranspiration() const;
   double GetSumRunoff() const;
-  double GetSumGlacierIceMelt() const;
   double GetLandArea() const;
   double GetLakeArea() const;
   double GetGlacierArea() const;
@@ -1044,7 +1040,6 @@ private:
   double sumPrecipitation;
   double sumEvapotranspiration;
   double sumRunoff;
-  double sumGlacierIceMelt;
   double accumulatedSum;
   double accumulatedSumLake;
   double accumulatedSumSnow;

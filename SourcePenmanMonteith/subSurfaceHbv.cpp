@@ -8,12 +8,16 @@ void HBV::WaterBalance(int timeStep, DateTime datetime, double waterInput, doubl
   double lowerRunoff, upperRunoff, lowerPercolation, upperPercolation, upperTemporary;
   double lowerZoneMax, drawUp;
   temp = GetInputElement()->GetInput(1);
-  //  cout << "timeStep " << timeStep << " " << soilMoisture << " " << upperZone << " " << lowerZone << " " << endl;
-  //  cout << "\ntimeStep " << timeStep << "   subSurfacePar->GetFC()  " << subSurfacePar->GetFC() << endl;
 
   /* Maximum lower zone storage */
   lowerZoneMax = subSurfacePar->GetPERC()/subSurfacePar->GetKLZ();
-
+  /*if(timeStep==0) {
+    cout << "timeStep " << timeStep << " sM " << soilMoisture << " uZ " << upperZone << " lZ " << lowerZone << " " << endl;
+    cout << "subSurfacePar->GetFC() " << subSurfacePar->GetFC() << " subSurfacePar->GetKUZ()  " << subSurfacePar->GetKUZ() << endl;
+    cout << "subSurfacePar->GetPerc() " << subSurfacePar->GetPERC() << " subSurfacePar->GetKLZ() " << subSurfacePar->GetKLZ() << endl;
+     cout << "timeStep " << timeStep << "  lowerzonemax " << lowerZoneMax << endl;
+     }*/
+  
   /* Capillary rise from lower zone to soil moisture zone */
   drawUp = (2.0*subSurfacePar->GetDRAW())*(lowerZone/lowerZoneMax)*(subSurfacePar->GetFC()-soilMoisture)/(subSurfacePar->GetFC());    
   lowerZone = lowerZone - drawUp;

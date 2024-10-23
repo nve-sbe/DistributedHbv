@@ -150,7 +150,7 @@ int main(int argc, char *argv[])
   // Watercourse outlets
   fileWCo.ignore(100,':');
   fileWCo >> numWatcOut;
-  cout << "\n # Number of watercourse outlets " << numWatcOut << endl;
+  cout << "\n # hm Number of watercourse outlets " << numWatcOut << endl;
   SubCatchment ** Outlet = new SubCatchment * [numWatcOut];
   for (i=0; i<numWatcOut; i++) {
     fileWCo >> j;
@@ -1078,7 +1078,7 @@ void WriteLandScapeElements(DistributedHbv * const DistHbv, ParametersGeneral * 
       glacPer=DistHbv[i].GetGlacierPercent();
       areaCorr[0]=areaFraction[0];
       areaCorr[1]=areaFraction[1];
-      areaCorr[2] = areaFraction[2];
+      areaCorr[2]=areaFraction[2];
       //      cout << lakePer << "    " << glacPer << "    "  << areaCorr[0] << "    "
       //           << areaCorr[1] << endl;
       totalArea = lakePer + glacPer + areaCorr[0] + areaCorr[1] + areaCorr[2];
@@ -1089,7 +1089,7 @@ void WriteLandScapeElements(DistributedHbv * const DistHbv, ParametersGeneral * 
         //        } else {
         areaCorr[0]=areaFraction[0]+areaFraction[0]*(100.0-totalArea)/(areaFraction[0]+areaFraction[1]+areaFraction[2]);
         areaCorr[1]=areaFraction[1]+areaFraction[1]*(100.0-totalArea)/(areaFraction[0]+areaFraction[1]+areaFraction[2]);
-	areaCorr[2] = areaFraction[2] + areaFraction[2] * (100.0 - totalArea) / (areaFraction[0] + areaFraction[1] + areaFraction[2]);
+	areaCorr[2]=areaFraction[2]+areaFraction[2]*(100.0-totalArea)/(areaFraction[0]+areaFraction[1]+areaFraction[2]);
         //       }
         totalArea = lakePer + glacPer + areaCorr[0] + areaCorr[1] + areaCorr[2];
         if (totalArea!=100.0) cout << endl << "totalArea    " << totalArea << endl;

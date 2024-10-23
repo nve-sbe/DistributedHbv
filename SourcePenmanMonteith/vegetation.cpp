@@ -145,14 +145,19 @@ void Vegetation::WaterBalance(int timeStep, DateTime datetime, int dayofyear_PM2
        else {
      int_max = landSurfacePar->GetINTER_MAX();
      }
-     
-  potev = potentialEvap (temp, tempMax, tempMin, radiationS, vp, 
+     if(GetLandScapeElement()->GetEvaporationControlObj()->GetEvaporationModellingControl() == 'P')
+     potev = potentialEvap (temp, tempMax, tempMin, radiationS, vp, 
 	                     wind1, dayofyear_PM2, GetLandScapeElement()->GetLatitude(), GetLandScapeElement()->GetElevation(),
-	  commonPar->GetHeight_WIND_INSTRUMENT(), commonPar->GetHeight_HUMI_INSTRUMENT(),
-	  landSurfacePar->GetTREE_HEIGHT(), calc_lai, landSurfacePar->GetTREE_LAI_CORR(), 
-	  landSurfacePar->GetALBEDO(), landSurfacePar->GetBULK_RESISTANCE(),landSurfacePar->GetALBEDO_SNOW(),
-	  landSurfacePar->GetDECIDUOUS_SHARE(), snowCoverFraction,landSurfacePar->GetWind_H(),landSurfacePar->GetTopen_min(), landSurfacePar->GetTclose_min(), landSurfacePar->GetVPDclose(), landSurfacePar->GetVPDopen(),
-			 landSurfacePar->GetGH(), landSurfacePar->GetCL(), landSurfacePar->GetZ0G(), landSurfacePar->GetGSMAX(), landSurfacePar->GetCR(), landSurfacePar->GetD50(),   landSurfacePar->GetQ50()) / 1000.;  // convert from mm/day to m/day 
+			    commonPar->GetHeight_WIND_INSTRUMENT(), commonPar->GetHeight_HUMI_INSTRUMENT(),
+			    landSurfacePar->GetTREE_HEIGHT(), calc_lai, landSurfacePar->GetTREE_LAI_CORR(), 
+			    landSurfacePar->GetALBEDO(), landSurfacePar->GetBULK_RESISTANCE(),landSurfacePar->GetALBEDO_SNOW(),
+			    landSurfacePar->GetDECIDUOUS_SHARE(), snowCoverFraction,landSurfacePar->GetWind_H(),
+			    landSurfacePar->GetTopen_min(), landSurfacePar->GetTclose_min(), landSurfacePar->GetVPDclose(),
+			    landSurfacePar->GetVPDopen(),landSurfacePar->GetGH(), landSurfacePar->GetCL(),
+			    landSurfacePar->GetZ0G(), landSurfacePar->GetGSMAX(), landSurfacePar->GetCR(),
+			    landSurfacePar->GetD50(),   landSurfacePar->GetQ50()) / 1000.;  // convert from mm/day to m/day 
+      else 
+      potev =  potentialEvapTemperatureIndex(temp, landSurfacePar->GetEPOT_PAR()); 
 
   /* Water input from precipitation and/or snowmelt > 0 or interception remaining from previous time step */
   if (precipitation > 0.0 || prevInterception > 0.0) {
