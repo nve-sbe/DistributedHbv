@@ -1,7 +1,7 @@
 #include "classDistHbv.h"
 #include "utilities.h"
 
-void LakeWaterBalance::WaterBalance(int timeStep, DateTime datetime, int dayofyear_PM2)
+void LakeWaterBalance::WaterBalance(int timeStep, DateTime datetime)
 {
   double tempMemory;
   double stage, newStage;
@@ -12,11 +12,6 @@ void LakeWaterBalance::WaterBalance(int timeStep, DateTime datetime, int dayofye
   int i;
   precipitation=GetInputElement()->GetInput(0);
   temp = GetInputElement()->GetInput(1);
-  tempMax = GetInputElement()->GetInput(2);
-  tempMin = GetInputElement()->GetInput(3);
-  wind1 = GetInputElement()->GetInput(4);
-  radiationS = GetInputElement()->GetInput(5);
-  vp = GetInputElement()->GetInput(6);
   /*  cout << "    timeStep " << timeStep << "          Lake precipitation " << precipitation;
       cout << "    Temperature " << temp << endl;*/
 
@@ -25,26 +20,28 @@ void LakeWaterBalance::WaterBalance(int timeStep, DateTime datetime, int dayofye
   /*  Lake temperature and evaporation  */
   tempMemory = commonPar->GetDAY_TEMP_MEMORY() * 86400.0/commonPar->GetSECONDS_TIMESTEP();
   lakeTemp = lakeTemp*(1.0-(1.0/tempMemory))+temp/tempMemory;
-  if (lakeTemp > 0.0) {
-    if(GetLandScapeElement()->GetEvaporationControlObj()->GetEvaporationModellingControl() == 'P')
-      lakeEvaporation = potentialEvapLake(temp, tempMax, tempMin, radiationS, vp, 
-					  wind1, dayofyear_PM2,GetLandScapeElement()->GetLatitude(),
-					  GetLandScapeElement()->GetElevation(),
-					  commonPar->GetHeight_WIND_INSTRUMENT() ) / 1000.; // convert from mm/day to m/day
-     else
-       lakeEvaporation =  potentialEvapTemperatureIndex(lakeTemp, commonPar->GetLAKE_EPOT_PAR()); //hvis ikke P, så er det T. ikke dele på 1000 her! (?)
+  if (GetLandScapeElement()->GetEvaporationControlObj()->GetEvaporationModellingControl() == 'M' || 
+      GetLandScapeElement()->GetEvaporationControlObj()->GetEvaporationModellingControl() == 'm') {
+    i = datetime.getMonth()-1;
+    lakeEvaporation = potentialEvapLongTermMean(lakeTemp, GetLandScapeElement()->GetEvaporationControlObj()->GetEvaporationArray(i)/1000.0);
+    /*for (i=0; i<numberPotentialEvaporationValuesPerYear; i++) {
+      cout << " " << i << "    " << GetLandScapeElement()->GetEvaporationControlObj()->GetEvaporationArray(i) << "\n";
+      }*/
   }
-  else
-    lakeEvaporation = 0.0;
-  if (waterLevel < (-1)*deltaLevel) {
-    lakeEvaporation = 0.0;
-    //    waterLevel = (-1)*deltaLevel;
+  else {
+    lakeEvaporation = potentialEvapTemperatureIndex(lakeTemp, commonPar->GetLAKE_EPOT_PAR());
   }
 
   /*  Lake rating curve parameters  */
   deltaLevel = commonPar->GetDELTA_LEVEL();
   nLake = commonPar->GetNLAKE();
   kLake = commonPar->GetKLAKE();
+
+  /*  Lake water level minimum  */
+  if (waterLevel < (-1)*deltaLevel) {
+    //    lakeEvaporation = 0.0;
+    waterLevel = (-1)*deltaLevel;
+  }
 
   /*  Initial lake water level  */
   stage = waterLevel + waterInput - lakeEvaporation;
@@ -59,13 +56,13 @@ void LakeWaterBalance::WaterBalance(int timeStep, DateTime datetime, int dayofye
 
   /*  Final runoff  */
   newStage = stage - runoff;
-  //if (runoff > 0.0) {                                  // New test added in order to allow lake evaporation to draw water below -deltaLevel
-  //if (newStage + deltaLevel < 0.0) {
-  //  runoff = runoff + newStage + deltaLevel;
-  //  if (runoff < 0.0) runoff = 0.0;
-  //  newStage = (-1)*deltaLevel;
-  //}
-  //}
+  //  if (runoff > 0.0) {                                  // New test added in order to allow lake evaporation to draw water below -deltaLevel
+  //    if (newStage + deltaLevel < 0.0) {
+  //      runoff = runoff + newStage + deltaLevel;
+  //      if (runoff < 0.0) runoff = 0.0;
+  //      newStage = (-1)*deltaLevel;
+  //    }
+  //  }
 
   /*  Final lake water level and lake water level change  */
   waterLevelChange = newStage - waterLevel;

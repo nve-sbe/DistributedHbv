@@ -40,6 +40,7 @@ void LakeWaterBalance::WaterBalance(int timeStep, DateTime datetime)
   /*  Lake water level minimum  */
   if (waterLevel < (-1)*deltaLevel) {
     lakeEvaporation = 0.0;
+    //    waterLevel = (-1)*deltaLevel;
   }
 
   /*  Initial lake water level  */
