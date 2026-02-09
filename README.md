@@ -1,8 +1,8 @@
 ## HbvNorway 
-Spatially distributed HBV hydrological model with land surface characteristics based on N50 geospatial data from Norwegian Mapping Authority
+Spatially distributed HBV hydrological model with land surface characteristics based on N50 geospatial data from Norwegian Mapping Authority and temperature-based metod for evapotranspiration
 
 ## HbvGeneral 
-Spatially distributed HBV hydrological model with general land surface characteristics
+Spatially distributed HBV hydrological model with general land surface characteristics and temperature-based metod for evapotranspiration
 
 ## HbvPenmanMonteith 
 Spatially distributed HBV hydrological model with general land surface characteristics and Penman-Monteith equation for evapotranspiration
