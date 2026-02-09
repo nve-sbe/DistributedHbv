@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
   double precStationsWeightedElevation, tempStationsWeightedElevation;
   double correction;
   double xllCorner, yllCorner, cellSize;
-  double elementArea, elementLatitude, elementElevation, elementTimefalling, elementSlopeAngle, elementAspect, lakePercent, glacierPercent;
+  double elementArea, elementLatitude, elementElevation, elementTimefalling, elementSlopeAngle, elementAspect, elementPcorr, lakePercent, glacierPercent;
   double areaFraction[maximumNumberLandClasses];
   DateTime datetime;
   DateTime datetime_nc;
@@ -411,7 +411,7 @@ int main(int argc, char *argv[])
   } 
   for (i=0; i<numLand; i++) {
     finLandScape >> landIndex >> geoIndex >> elementArea >> elementLatitude >> elementElevation >> elementTimefalling;
-    finLandScape >> elementSlopeAngle >> elementAspect >> lakePercent >> glacierPercent;
+    finLandScape >> elementSlopeAngle >> elementAspect >> elementPcorr >> lakePercent >> glacierPercent;
     sumArea = lakePercent + glacierPercent;
     for (j=0; j<maximumNumberLandClasses; j++) {
       finLandScape >> landSurf >> soil >> areaFraction[j]; 
@@ -436,6 +436,7 @@ int main(int argc, char *argv[])
     DistHbv[landIndex].SetTimeFalling(elementTimefalling);
     DistHbv[landIndex].SetSlopeAngle(elementSlopeAngle);
     DistHbv[landIndex].SetAspect(elementAspect);
+    DistHbv[landIndex].SetPcorr(elementPcorr);
     DistHbv[landIndex].SetSelectedTimeSeriesElements(SelectedTimeSeriesElementsStore);
     DistHbv[landIndex].SetGeneralPar(ParGeneralStore);
 
@@ -1049,7 +1050,7 @@ void SnowGlacierIceReDistribution(SubCatchment ** const Outlet, DistributedHbv *
       //        cout << "            Snow " << datetime.getYear() << " " << datetime.getMonth() << " " << datetime.getDay() << " " << endl;
         for (i = 0; i < numLand; i++)
         {
-	  //cout << "  ingjerd snow set to zero.... " << ParGeneralStore->GetDAY_SNOW_ZERO() << endl;
+	  //cout << "   snow set to zero.... " << ParGeneralStore->GetDAY_SNOW_ZERO() << endl;
 	  DistHbv[i].SetSnowStore(0.0);
         }
     }
@@ -1283,13 +1284,13 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
   for (i = 0; i<numberIndexStore; i++) {
      if (k<numLand) {
        //  if (DistHbv[k].GetGeoIndex()==ELEMENT(i,j)) {
-        while (DistHbv[k].GetGeoIndex()<indexStore[i]) {
-	    cout << " element not found " << i << " " << indexStore[i] << "    " << k << " " << DistHbv[k].GetGeoIndex() << endl;
-	    k++;
-	}
+       while (DistHbv[k].GetGeoIndex()<indexStore[i]) {
+	 //	 cout << " Binary grid element not found " << i << " " << indexStore[i] << "    " << k << " " << DistHbv[k].GetGeoIndex() << endl;
+	 k++;
+       }
 	if(dayofyear_PM2==244) {
-	  cout << "ingjerd bil i " << i << " indexStore(i) " << indexStore[i] << endl;
-	  cout << "ingjerd bil k "  << k << " getgeo(k) " << DistHbv[k].GetGeoIndex() << endl;
+	  cout << " bil i " << i << " indexStore(i) " << indexStore[i] << endl;
+	  cout << " bil k "  << k << " getgeo(k) " << DistHbv[k].GetGeoIndex() << endl;
 	}
 
 	if (DistHbv[k].GetGeoIndex() == indexStore[i]) {
@@ -1323,7 +1324,7 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
           //      printf("%d  %hu  %hu\n",ELEMENT(i,j),precip10[ELEMENT(i,j)],temp10K[ELEMENT(i,j)]);
           /*if (precip10[ELEMENT(i,j)]<metMissing && temp10K[ELEMENT(i,j)]<metMissing) {
             *inputDataFound=true;
-            precipitation = DistHbv[k].GetPrecipitationCorrection()*(double)precip10[ELEMENT(i,j)]/10000.0;
+            precipitation = DistHbv[k].GetPrecipitationCorrection()*DistHbv[k].GetPcorr()*(double)precip10[ELEMENT(i,j)]/10000.0;
             temperature = DistHbv[k].GetTemperatureCorrection()+(double)(temp10K[ELEMENT(i,j)]-2731)/10.0;
 			Tmax = DistHbv[k].GetTemperatureCorrection() + (double)(tmax10K[ELEMENT(i, j)] - 2731) / 10.0;
 			Tmin = DistHbv[k].GetTemperatureCorrection() + (double)(tmin10K[ELEMENT(i, j)] - 2731) / 10.0;
@@ -1334,7 +1335,7 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
 
 		  if (precip10[indexStore[i]]<metMissing && temp10K[indexStore[i]]<metMissing) {
 			  *inputDataFound = true;
-			  precipitation = DistHbv[k].GetPrecipitationCorrection()*(double)precip10[indexStore[i]] / 10000.0;
+			  precipitation = DistHbv[k].GetPrecipitationCorrection()*DistHbv[k].GetPcorr()*(double)precip10[indexStore[i]] / 10000.0;
 			  temperature = DistHbv[k].GetTemperatureCorrection() + (double)(temp10K[indexStore[i]] - 2731) / 10.0;
 			  Tmax = DistHbv[k].GetTemperatureCorrection() + (double)(tmax10K[indexStore[i]] - 2731) / 10.0;
 			  Tmin = DistHbv[k].GetTemperatureCorrection() + (double)(tmin10K[indexStore[i]] - 2731) / 10.0;
@@ -1375,7 +1376,7 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
             }
             if (precip10[ELEMENT(i,jNew)]<metMissing && temp10K[ELEMENT(i,jNew)]<metMissing) {
               *inputDataFound=true;
-              precipitation = DistHbv[k].GetPrecipitationCorrection()*(double)precip10[ELEMENT(i,jNew)]/10000.0;
+              precipitation = DistHbv[k].GetPrecipitationCorrection()*DistHbv[k].GetPcorr()*(double)precip10[ELEMENT(i,jNew)]/10000.0;
               temperature = DistHbv[k].GetTemperatureCorrection()+(double)(temp10K[ELEMENT(i,jNew)]-2731)/10.0;
               //      printf("%d  %f  %f\n",ELEMENT(i,jNew),precipitation,temperature);
               InputElementStore->SetInput(0,precipitation);
@@ -1436,20 +1437,20 @@ void WaterBalanceGridNetcdf(DistributedHbv * DistHbv,  ParametersGeneral * ParGe
   iday = dayNumber(datetime.getYear(), datetime.getMonth(), datetime.getDay()-1); //iday to use when finding todays forcings
   dayofyear=iday;
   //if(iday==244) 
-  //  printf("ingjerd waterbalancegridnetcdf %d %d %d prec today %.2f %.2f %.2f %.2f %.2f\n",
+  //  printf(" waterbalancegridnetcdf %d %d %d prec today %.2f %.2f %.2f %.2f %.2f\n",
   //	   datetime.getYear(),datetime.getMonth(),datetime.getDay(),prec_in[iday*nRows*nCols+72748],temp_in[iday*nRows*nCols+72748],tmax_in[iday*nRows*nCols+72748],tmin_in[iday*nRows*nCols+72748],srad_in[iday*nRows*nCols+72748]);
  
   k=0;
   for (i = 0; i<numberIndexStore; i++) {
     if (k<numLand) {
       while (DistHbv[k].GetGeoIndex()<indexStore[i]) {
-	cout << " 2 element not found i " << i << " indexStore " << indexStore[i] << " k " << k << " getgeo " << DistHbv[k].GetGeoIndex() << endl;
+	//	cout << " Netcdf grid element not found in " << i << " indexStore " << indexStore[i] << " k " << k << " getgeo " << DistHbv[k].GetGeoIndex() << endl;
 	k++;
-       }
-       if (DistHbv[k].GetGeoIndex() == indexStore[i]) {
-  	 //cout << " 2 element found i " << i << " indexStore " << indexStore[i] << " k " << k << " getgeo " << DistHbv[k].GetGeoIndex() << endl;
+      }
+      if (DistHbv[k].GetGeoIndex() == indexStore[i]) {
+  	 //cout << " Netcdf grid element found in " << i << " indexStore " << indexStore[i] << " k " << k << " getgeo " << DistHbv[k].GetGeoIndex() << endl;
 	 icell=iday*nRows*nCols+indexStore[i];
-	 precipitation = DistHbv[k].GetPrecipitationCorrection()*prec_in[icell]/1000.; // prec from mm to m
+	 precipitation = DistHbv[k].GetPrecipitationCorrection()*DistHbv[k].GetPcorr()*prec_in[icell]/1000.; // prec from mm to m
 	 temperature = DistHbv[k].GetTemperatureCorrection()+temp_in[icell]; // temperatures in C
 	 Tmax = DistHbv[k].GetTemperatureCorrection()+tmax_in[icell]; 
 	 Tmin = DistHbv[k].GetTemperatureCorrection()+tmin_in[icell];
@@ -1571,7 +1572,7 @@ void ReadNetcdf(int initialTimeSteps, int numberTimeSteps,
 
   dayofyear = dayNumber(datetime.getYear(), datetime.getMonth(), datetime.getDay());
   ndays=dayNumber(datetime.getYear(),12,31);
-  printf("ingjerd readnetcdf %d %d %d DoY %d, ET scheme: %c\n",
+  printf("readnetcdf %d %d %d DoY %d, ET scheme: %c\n",
 	 datetime.getYear(),datetime.getMonth(),datetime.getDay(),dayofyear,ETscheme);
 
   count[0]=ndays;
@@ -1642,7 +1643,7 @@ void ReadNetcdf(int initialTimeSteps, int numberTimeSteps,
       for(j=0;j<nCols;j++) {
 	if(k<=180 && cellid==1573912) {
 	  dummy=hurs_in[flag]*(6.11*exp((17.27*temp_in[flag])/(237.3+temp_in[flag]))); //Pa
-	  printf("ingjerd readnetcdf day %d row %d col %d cellnr %d \t p %.1f t %.2f srad %.1f vp %.1f vp-est %.3f hurs %.1f\n",
+	  printf("readnetcdf day %d row %d col %d cellnr %d \t p %.1f t %.2f srad %.1f vp %.1f vp-est %.3f hurs %.1f\n",
 		 k,i,j,i*nCols+j,prec_in[flag],temp_in[flag],srad_in[flag],vp_in[flag],dummy,hurs_in[flag]);
 	}
 	flag+=1;
@@ -1765,7 +1766,7 @@ void ReadNetcdfClimateProj(int initialTimeSteps, int numberTimeSteps,
 
   dayofyear = dayNumber(datetime.getYear(), datetime.getMonth(), datetime.getDay());
   ndays=dayNumber(datetime.getYear(),12,31);
-  printf("ingjerd readnetcdf %d %d %d DoY %d, ET scheme: %c\n",
+  printf("readnetcdf %d %d %d DoY %d, ET scheme: %c\n",
 	 datetime.getYear(),datetime.getMonth(),datetime.getDay(),dayofyear,ETscheme);
 
   count[0]=ndays;
@@ -2763,7 +2764,7 @@ void WriteBinaryGrid(DistributedHbv * const DistHbv, DateTime datetime, int numL
   writeTem=writePre=0;
   writeGmb=writeLak=writeSmw=writeHlz=writeScf=0;
    
-  sprintf(dirName,"./hbv_output/");
+  sprintf(dirName,"./output_bil/");
   sprintf(timeName,"_%04d_%02d_%02d.bil",datetime.getYear(),datetime.getMonth(),datetime.getDay());
   //cout << endl << " date  " << datetime.getYear() << datetime.getMonth() << datetime.getDay() << endl;
   // cout << endl << " numLand  " << numLand << endl;
@@ -3179,12 +3180,15 @@ void WriteAsciiGrid(DistributedHbv * const DistHbv, DateTime datetime, int numLa
 {
   int i,j,k;
   char fileName[100];
+  char dirName[100];
   char timeName[100];
 
+  sprintf(dirName,"./output_asc/");
   sprintf(timeName,"_%04d_%02d_%02d.asc",datetime.getYear(),datetime.getMonth(),datetime.getDay());
 
   //  fout << "Temperature in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hbv_output/tem");
+  strcpy(fileName,dirName);
+  strcpy(fileName,"tem");
   strcat(fileName,timeName);
   ofstream fileTemp(fileName);
   if (!fileTemp.is_open()) {
@@ -3206,7 +3210,8 @@ void WriteAsciiGrid(DistributedHbv * const DistHbv, DateTime datetime, int numLa
   fileTemp.close();
 
   fout << "Precipitation in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hbv_output/pre");
+  strcpy(fileName,dirName);
+  strcpy(fileName,"pre");
   strcat(fileName,timeName);
   ofstream filePrec(fileName);
   if (!filePrec.is_open()) {
@@ -3229,7 +3234,8 @@ void WriteAsciiGrid(DistributedHbv * const DistHbv, DateTime datetime, int numLa
   filePrec.close();
 
   //  fout << "Evapotranspiration from landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hbv_output/eva");
+  strcpy(fileName,dirName);
+  strcpy(fileName,"eva");
   strcat(fileName,timeName);
   ofstream fileEvap(fileName);
   if (!fileEvap.is_open()) {
@@ -3251,7 +3257,8 @@ void WriteAsciiGrid(DistributedHbv * const DistHbv, DateTime datetime, int numLa
   fileEvap.close();
   
   //  fout << "Snow store in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hbv_output/swe");
+  strcpy(fileName,dirName);
+  strcpy(fileName,"swe");
   strcat(fileName,timeName);
   ofstream fileSwe(fileName);
   if (!fileSwe.is_open()) {
@@ -3273,7 +3280,8 @@ void WriteAsciiGrid(DistributedHbv * const DistHbv, DateTime datetime, int numLa
   fileSwe.close();
   
   //  fout << "Snowcover fraction in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hbv_output/scf");
+  strcpy(fileName,dirName);
+  strcpy(fileName,"scf");
   strcat(fileName,timeName);
   ofstream fileScf(fileName);
   if (!fileScf.is_open()) {
@@ -3295,7 +3303,8 @@ void WriteAsciiGrid(DistributedHbv * const DistHbv, DateTime datetime, int numLa
   fileScf.close();
   
   //  fout << "Snow meltwater in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hbv_output/smw");
+  strcpy(fileName,dirName);
+  strcpy(fileName,"smw");
   strcat(fileName,timeName);
   ofstream fileSmw(fileName);
   if (!fileSmw.is_open()) {
@@ -3317,7 +3326,8 @@ void WriteAsciiGrid(DistributedHbv * const DistHbv, DateTime datetime, int numLa
   fileSmw.close();
   
   //  fout << "Runoff from landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hbv_output/run");
+  strcpy(fileName,dirName);
+  strcpy(fileName,"run");
   strcat(fileName,timeName);
   ofstream fileRunoff(fileName);
   if (!fileRunoff.is_open()) {
@@ -3339,7 +3349,8 @@ void WriteAsciiGrid(DistributedHbv * const DistHbv, DateTime datetime, int numLa
   fileRunoff.close();
   
   //  fout << "Discharge from landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hbv_output/hbv");
+  strcpy(fileName,dirName);
+  strcpy(fileName,"hbv");
   strcat(fileName,timeName);
   ofstream fileDisch(fileName);
   if (!fileDisch.is_open()) {
@@ -3361,7 +3372,8 @@ void WriteAsciiGrid(DistributedHbv * const DistHbv, DateTime datetime, int numLa
   fileDisch.close();
   
   //  fout << "Soil moisture deficit in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hbv_output/hsd");
+  strcpy(fileName,dirName);
+  strcpy(fileName,"hsd");
   strcat(fileName,timeName);
   ofstream fileHsd(fileName);
   if (!fileHsd.is_open()) {
@@ -3383,7 +3395,8 @@ void WriteAsciiGrid(DistributedHbv * const DistHbv, DateTime datetime, int numLa
   fileHsd.close();
   
   //  fout << "Soil moisture in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hbv_output/hsm");
+  strcpy(fileName,dirName);
+  strcpy(fileName,"hsm");
   strcat(fileName,timeName);
   ofstream fileHsm(fileName);
   if (!fileHsm.is_open()) {
@@ -3405,7 +3418,8 @@ void WriteAsciiGrid(DistributedHbv * const DistHbv, DateTime datetime, int numLa
   fileHsm.close();
   
   //  fout << "Upper zone in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hbv_output/huz");
+  strcpy(fileName,dirName);
+  strcpy(fileName,"huz");
   strcat(fileName,timeName);
   ofstream fileHuz(fileName);
   if (!fileHuz.is_open()) {
@@ -3428,7 +3442,8 @@ void WriteAsciiGrid(DistributedHbv * const DistHbv, DateTime datetime, int numLa
   fileHuz.close();
   
   //  fout << "Lower zone in landscape elements at time step " << timeStep << ":\n";
-  strcpy(fileName,"hbv_output/hlz");
+  strcpy(fileName,dirName);
+  strcpy(fileName,"hlz");
   strcat(fileName,timeName);
   ofstream fileHlz(fileName);
   if (!fileHlz.is_open()) {
@@ -3460,7 +3475,7 @@ void WriteAsciiGridWaterBalance(DistributedHbv * const DistHbv, DateTime startSi
     char dirName[100];
     char timeName[100];
   
-    sprintf(dirName,"./hbv_output/");
+    sprintf(dirName,"./output_asc/");
     sprintf(timeName,"_%04d_%02d_%02d_%04d_%02d_%02d.asc",startSimulationTime.getYear(),startSimulationTime.getMonth(),startSimulationTime.getDay(),
   	  endSimulationTime.getYear(),endSimulationTime.getMonth(),endSimulationTime.getDay());
   

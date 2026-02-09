@@ -1194,6 +1194,7 @@ DistributedHbv::DistributedHbv():
   timefalling(0.0),
   slopeAngle(0.0),
   aspect(0.0),
+  Pcorr(0.0),
   precipitationCorrection(1.0),
   temperatureCorrection(0.0),
   accumulatedDischarge(0.0),

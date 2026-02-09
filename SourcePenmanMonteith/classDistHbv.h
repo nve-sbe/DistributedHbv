@@ -887,6 +887,8 @@ class DistributedHbv
   double GetSlopeAngle() const { return slopeAngle; }
   void SetAspect(double value) { aspect = value; }
   double GetAspect() const { return aspect; }
+  void SetPcorr(double value) { Pcorr = value; }
+  double GetPcorr() const { return Pcorr; }
   void SetSelectedTimeSeriesElements(SelectedTimeSeriesElements *object) { selectedElements = object; }
   SelectedTimeSeriesElements *GetSelectedTimeSeriesElements() const { return selectedElements; }
   void SetGeneralPar(ParametersGeneral *parObj) { commonPar = parObj; }
@@ -1051,6 +1053,7 @@ private:
   double timefalling;
   double slopeAngle;
   double aspect;
+  double Pcorr;
   double precipitationCorrection;
   double temperatureCorrection;
   double accumulatedDischarge;

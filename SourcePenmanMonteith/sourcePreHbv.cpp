@@ -493,7 +493,7 @@ void ReadLandUse(DistributedHbv * const DistHbv, int nRows, int nCols, int noDat
   finTreeLevel >> buffer >> cellS;
   finTreeLevel >> buffer >> noDa;
   if (nCo!=nCols || nRo!=nRows || xllC!=xllCorner || yllC!=yllCorner || cellS!=cellSize || noDa!=noData) {
-    cout << "\n\n Error in grid header information for glacier percent!\n\n";
+    cout << "\n\n Error in grid header information for tree level!\n\n";
     cout << " nCols        " << nCo << "\t  " << nCols << endl;
     cout << " nRows        " << nRo << "\t  " << nRows << endl;
     cout << " xllCorner    " << xllC << "\t  " << xllCorner << endl;
@@ -815,6 +815,46 @@ void ReadLandUseGeneral(DistributedHbv * const DistHbv, int nRows, int nCols, in
   }
   finT1.close();
   // Read end
+  // Read Pcorr of grid cells
+  //  previousValue=-9999.0;
+  /*  cout << " File with Pcorr values: ";
+      cin >> fileName;
+      cout << endl;*/
+  fileControl.ignore(100,':');
+  fileControl >> fileName;
+  fileControl.ignore(1024,'\n');
+  ifstream finPcorr(fileName);  // Open for reading
+  if (!finPcorr.is_open()) {
+    cout << endl << " Error opening file " << fileName << endl << endl;
+    exit (1);
+  }
+  finPcorr >> buffer >> nCo;
+  finPcorr >> buffer >> nRo;
+  finPcorr >> buffer >> xllC;
+  finPcorr >> buffer >> yllC;
+  finPcorr >> buffer >> cellS;
+  finPcorr >> buffer >> noDa;
+  if (nCo!=nCols || nRo!=nRows || xllC!=xllCorner || yllC!=yllCorner || cellS!=cellSize || noDa!=noData) {
+    cout << "\n\n Error in grid header information for T1!\n\n";
+    cout << " nCols        " << nCo << "\t  " << nCols << endl;
+    cout << " nRows        " << nRo << "\t  " << nRows << endl;
+    cout << " xllCorner    " << xllC << "\t  " << xllCorner << endl;
+    cout << " yllCorner    " << yllC << "\t  " << yllCorner << endl;
+    cout << " cellSize     " << cellS << "\t  " << cellSize << endl;
+    cout << " noData       " << noDa << "\t  " << noData << endl << endl;
+    exit (1);
+  }
+  for (i=0; i<nRows*nCols; i++) {
+    finPcorr >> value;
+    if (value<0.0) value=1.0;
+    //    if (value<0.0 && previousValue>=0.0) value=previousValue;
+    //    else if (value<0.0) value=0.0;
+    DistHbv[i].SetPcorr(value);
+    //    previousValue=value;
+  }
+  finPcorr.close();
+  // Read end
+
 
   // Read percentage of grid cells covered by lakes
   //  previousValue=-9999.0;
@@ -1110,6 +1150,7 @@ void WriteLandScapeElements(DistributedHbv * const DistHbv, ParametersGeneral * 
       landScapeOut.width(10); landScapeOut << DistHbv[i].GetT1() << "  ";
       landScapeOut.width(10); landScapeOut << DistHbv[i].GetSlopeAngle() << "  ";
       landScapeOut.width(10); landScapeOut << DistHbv[i].GetAspect() << "  ";
+      landScapeOut.width(10); landScapeOut << DistHbv[i].GetPcorr() << "  ";
       landScapeOut.width(10); landScapeOut << lakePer << "  ";
       landScapeOut.width(10); landScapeOut << glacPer << "  ";
       for (k=0; k<maximumNumberLandClasses; k++) {

@@ -99,6 +99,8 @@ class DistributedHbv
   double GetSlopeAngle() const { return slopeAngle; }
   void SetAspect(double value) { aspect = value; }
   double GetAspect() const { return aspect; }
+  void SetPcorr(double value) { Pcorr = value; }
+  int GetPcorr() const { return Pcorr; }
   void SetLakePercent(double value) { lakePercent = value; }
   double GetLakePercent() const { return lakePercent; }
   void SetForestPercent(double value) { forestPercent = value; }
@@ -139,6 +141,7 @@ private:
   double latitude;
   double slopeAngle;
   double aspect;
+  double Pcorr;
   double lakePercent;
   double forestPercent;
   double bogPercent;

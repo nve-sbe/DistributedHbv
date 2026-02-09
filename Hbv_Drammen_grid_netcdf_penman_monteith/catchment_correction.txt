@@ -1,0 +1,9 @@
+Catchment id.   Precipitation correction    Temperature correction
+    20268       1.0                         0.0
+    20279       1.0                         0.0
+    20323       1.0                         0.0
+    20634       1.0                         0.0
+   120171       1.0                         0.0
+   120178       1.0                         0.0
+   120215       1.0                         0.0
+   160140       1.0                         0.0

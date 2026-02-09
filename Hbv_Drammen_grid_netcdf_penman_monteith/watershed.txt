@@ -1,0 +1,19 @@
+# Number of catchments: 8
+0  :   20268      1.0
+1  :   20279      1.0
+2  :   20323      1.0
+3  :   20634      1.0 
+4  :  120171      1.0
+5  :  120178      1.0
+6  :  120215      1.0 
+7  :  160140      1.0
+# Number of catchment outlets: 8
+0
+1
+2
+3
+4
+5
+6
+7
+# Hierarchy of catchments
