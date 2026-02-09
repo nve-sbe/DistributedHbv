@@ -1,11 +1,11 @@
 ## HbvNorway 
-Spatially distributed HBV hydrological model with land surface characteristics based on N50 geospatial data from Norwegian Mapping Authority and temperature-based method for evapotranspiration
+Spatially distributed HBV hydrological model with temperature-based method for evapotranspiration, and land surface characteristics based on N50 geospatial data from Norwegian Mapping Authority
 
 ## HbvGeneral 
-Spatially distributed HBV hydrological model with general land surface characteristics and temperature-based method for evapotranspiration
+Spatially distributed HBV hydrological model with temperature-based method for evapotranspiration, and general land surface characteristics
 
 ## HbvPenmanMonteith 
-Spatially distributed HBV hydrological model with general land surface characteristics and Penman-Monteith equation for evapotranspiration
+Spatially distributed HBV hydrological model with Penman-Monteith equation for evapotranspiration, and general land surface characteristics
 
 ## Introduction
 The spatially distributed HBV hydrological model is used for modelling the water balance and lateral transport of water in the land phase of the hydrological cycle. The spatial distribution and shape of discrete landscape elements and the time steps of the model may be selected according to the problem to be solved. The model structure is based on Beldring et al. (2003). The requirements for running the model and the procedures for setting up the model definition files are described in the documentation, as well as the variables and parameters used for hydrological process simulations. Model parameters remain constant over time, or vary in a manner which may be described using physical principles or empirical relationships. Parameters either represent physically measurable properties of a watershed, or are used to describe hydrological processes. A variable may represent: (i) the state of the different storages in the hydrological system as approximated by the hydrological model; (ii) the input signal which drives the model; or (iii) the output from the model. Variables vary with time. 
