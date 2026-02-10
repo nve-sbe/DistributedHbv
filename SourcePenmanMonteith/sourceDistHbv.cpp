@@ -101,6 +101,7 @@ int main(int argc, char *argv[])
   bool readModelStates=false;
   bool writeModelStates=false;
   char fileName[100];
+  char *metPath;
   char metPathFileName[100];
   char metPath2FileName[100];
   char metPath3FileName[100];
@@ -279,6 +280,7 @@ int main(int argc, char *argv[])
 
   cout << startSimulationTime << endl << endSimulationTime << endl;
 
+  if (inputFileFormat == 'N' || inputFileFormat == 'n') {
   fileControl.ignore(100, ':');
   fileControl >> forcingType;
   fileControl.ignore(256, '\n');
@@ -345,7 +347,8 @@ int main(int argc, char *argv[])
   fileControl.ignore(256,'\n');
   strcpy(biasName,fileName);
   printf(" biasname: %s\n",fileName);
-
+  }
+    
   // Object for storing meteorological station information
   MeteorologicalStations * MetStations = new MeteorologicalStations;
   MetStations->SetMeteorologicalStations(fileControl, fout);
@@ -757,7 +760,7 @@ int main(int argc, char *argv[])
   }
   numberIndexStore = i;
   fgets(buffer, 256, finGridNumbers);
-  cout << endl << " Antall element i indexStore = " << numberIndexStore << endl;
+  cout << endl << " Number of elements in indexStore = " << numberIndexStore << endl;
   int * indexStore = new int[numberIndexStore];
   rewind(finGridNumbers);
   fgets(buffer, 256, finGridNumbers);
@@ -844,6 +847,16 @@ int main(int argc, char *argv[])
 
   // Grid file format input data (e.g. senorge data)
   else { 
+    // Path to grid files with meteorological input data
+    if (inputFileFormat == 'B' || inputFileFormat == 'b') {
+      // Path to grid files with meteorological input data
+      metPath = getenv("METDATA");
+      if (!metPath)
+      {
+	cout << " Environment variable METDATA not defined " << endl << endl;
+	exit(1);
+      }
+    }
     // allocate memory for input daily bil files (should only be necessary  if inputFileFormat == 'B' || inputFileFormat == 'b'  ) 
       unsigned short int * precip10 = new unsigned short int [nRows*nCols];
       unsigned short int * temp10K = new unsigned short int [nRows*nCols];
@@ -904,7 +917,7 @@ int main(int argc, char *argv[])
       else   //met input = bil files 
 	WaterBalanceGrid(DistHbv, ParGeneralStore, InputElementStore, initialTimeSteps, numberTimeSteps, 
 			 numLand, timeStep, nRows, nCols, 
-			 datetime, precPath, precip10, temp10K, tmax10K, tmin10K, wind10, solar10, vp10, 
+			 datetime, metPath, precip10, temp10K, tmax10K, tmin10K, wind10, solar10, vp10, 
 			 &inputDataFound, indexStore, numberIndexStore, fout);
         
        
@@ -966,7 +979,7 @@ int main(int argc, char *argv[])
   }
 
   // Write water balance grid
-   WriteAsciiGridWaterBalance(DistHbv, startSimulationTime, endSimulationTime, numLand, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout);
+  //   WriteAsciiGridWaterBalance(DistHbv, startSimulationTime, endSimulationTime, numLand, nRows, nCols, noData, xllCorner, yllCorner, cellSize, fout);
  
   // Write state variable time series for landscape elements selected for output
   WriteDistributedHbvTimeSeries(DistHbv, numLand, startSimulationTime, endSimulationTime, 
@@ -1170,7 +1183,7 @@ void WaterBalanceTimeSeries(DistributedHbv * const DistHbv, ParametersGeneral * 
 
 void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralStore, InputElement * InputElementStore,
                       int initialTimeSteps, int numberTimeSteps, 
-                      int numLand, int timeStep, int nRows, int nCols, DateTime datetime, char * precPath,
+                      int numLand, int timeStep, int nRows, int nCols, DateTime datetime, char * metPath,
                       unsigned short int * precip10, unsigned short int * temp10K, unsigned short int * tmax10K,
 		      unsigned short int * tmin10K, unsigned short int * wind10, unsigned short int * solar10,
 		      unsigned short int * vp10, bool * inputDataFound,
@@ -1190,6 +1203,14 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
   char VPFileName[100];
   char hydYear[5];
 
+  strcpy(precFileName,metPath);
+  strcpy(tempFileName,metPath);
+  strcpy(TmaxFileName, metPath);
+  strcpy(TminFileName, metPath);
+  strcpy(windFileName, metPath);
+  strcpy(solarFileName, metPath);
+  strcpy(VPFileName, metPath);
+  /*
   strcpy(precFileName,precPath); //same path for all variables when using .bil input files.
   strcpy(tempFileName,precPath);
   strcpy(TmaxFileName,precPath);
@@ -1197,7 +1218,7 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
   strcpy(windFileName,precPath);
   strcpy(solarFileName,precPath);
   strcpy(VPFileName,precPath);
-
+  */
   strcat(precFileName,"/rr/");
   strcat(tempFileName,"/tm/");
   strcat(TmaxFileName, "/tmax/");
@@ -1288,10 +1309,10 @@ void WaterBalanceGrid(DistributedHbv * DistHbv,  ParametersGeneral * ParGeneralS
 	 //	 cout << " Binary grid element not found " << i << " " << indexStore[i] << "    " << k << " " << DistHbv[k].GetGeoIndex() << endl;
 	 k++;
        }
-	if(dayofyear_PM2==244) {
+       /*	if(dayofyear_PM2==244) {
 	  cout << " bil i " << i << " indexStore(i) " << indexStore[i] << endl;
 	  cout << " bil k "  << k << " getgeo(k) " << DistHbv[k].GetGeoIndex() << endl;
-	}
+	  }*/
 
 	if (DistHbv[k].GetGeoIndex() == indexStore[i]) {
           //newPosition = ELEMENT(i,j)*(sizeof(unsigned short int));
