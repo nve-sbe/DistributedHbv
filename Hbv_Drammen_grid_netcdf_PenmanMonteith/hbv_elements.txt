@@ -1,0 +1,1 @@
+# Number of landscape elements selected for time series output: 0

@@ -1,0 +1,31 @@
+Type of model run, simulation(S) or calibration(C)                        : S
+Input data format, grid files(G) or time series file(T)                   : G
+Read netcdf or bil grid files (N= netcdf, B= bil)                         : N
+Evapotranspiration scheme (T=tempindex, P= penman)                        : P
+Output file name                                                          : hbv_out.txt
+Write all grid outputs (1,yes, 0, only PET, 2 none)                       : 2                          
+Start model date and time (day, month, year, hour, minute)                : 1 1 2000 12 0
+Start simulation date and time (day, month, year, hour, minute)           : 1 1 2001 12 0
+End simulation date and time (day, month, year, hour, minute)             : 31 12 2010 12 0
+Type of forcing data (S=senorge type obsdata, C=climate proj)             : S
+Path (precPath) to forcing data (precip)         : /proj-data/KiN2100/ForcingData/ObsData/seNorge2018_v20.05/netcdf/seNorge2018_RR_
+Path (tmeanPath) to forcing data (tmean)         : /proj-data/KiN2100/ForcingData/ObsData/seNorge2018_v20.05/netcdf/seNorge2018_
+Path (tmaxPath) to forcing data (tmax)           : /proj-data/KiN2100/ForcingData/ObsData/seNorge2018_v20.05/netcdf/seNorge2018_
+Path (tminPath) to forcing data (tmin)           : /proj-data/KiN2100/ForcingData/ObsData/seNorge2018_v20.05/netcdf/seNorge2018_
+Path (windPath) to forcing data (wind)           : /proj-data/KiN2100/ForcingData/ObsData/klinogrid/netcdf/ffm24h06_
+Path (rsdsPath) to forcing data (shortwave)      : /proj-data/KiN2100/ForcingData/ObsData/HySN2018v2005ERA5/netcdf/HySN2018v2005ERA5_historical_
+Path (hursPath) to forcing data (hurs)           : /proj-data/KiN2100/ForcingData/ObsData/HySN2018v2005ERA5/netcdf/HySN2018v2005ERA5_historical_
+ForcingName                                                               : obs
+RCPName                                                                   : hist
+BiasName                                                                  : raw
+File with meteorological stations                                         : met_stations.txt
+File with common parameters                                               : hbv_common_parameters.txt
+File with landsurface parameters                                          : hbv_landsurface_parameters.txt
+File with HBV subsurface parameters                                       : hbv_soil_parameters.txt
+File with landscape elements selected for time series output              : hbv_elements.txt
+File with landscape element information                                   : hbv_landscape.txt
+File with observed streamflow data                                        : obs_streamflow.txt
+File with sub-catchment hierarchy                                         : watershed.txt
+File with sub-catchment elements and landscape element information        : hbv_waterland.txt
+File with precipitation and temperature correction for catchments         : catchment_correction.txt
+File with grids for Norway                                                : landmask.txt

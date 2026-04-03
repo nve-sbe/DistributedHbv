@@ -1,0 +1,14 @@
+
+Meteorological stations: 
+1
+1
+Prec.    
+-9999  -9999  -9999  -9999
+Temp.    
+-9999  -9999  -9999  -9999
+
+Common parameters: 
+1
+1
+
+
